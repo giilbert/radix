@@ -1,9 +1,27 @@
-use warp::{Filter, Reply};
+use mongodb::bson::doc;
+use warp::{Filter, Rejection, Reply};
 
-pub fn auth_filter() -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
-    let create_user = warp::path!("create-user").and_then(|| async move {
-        return Ok::<_, warp::Rejection>("hello");
-    });
+use crate::{context::Context, rejections::IntoRejection};
+
+pub fn auth_filter(ctx: &Context) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    let ctx = ctx.to_filter();
+
+    let create_user = warp::path!("create-user")
+        .and(ctx)
+        .and_then(|ctx: Context| async move {
+            ctx.db
+                .collection("users")
+                .insert_one(
+                    doc! {
+                        "name": "Hello"
+                    },
+                    None,
+                )
+                .await
+                .handle()?;
+
+            return Ok::<_, Rejection>("hello");
+        });
 
     warp::path!("auth" / ..).and(create_user)
 }
