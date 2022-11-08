@@ -1,26 +1,29 @@
-mod context;
-mod filters;
+mod models;
 mod mongo;
-mod rejections;
+mod routers;
 
-use context::Context;
-use rejections::rejection_handler;
-use warp::Filter;
+use mongo::Db;
+use std::net::SocketAddr;
+
+use axum::{Extension, Router, Server};
+
+use crate::routers::auth::auth_routes;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     pretty_env_logger::init();
 
-    let client = mongo::connect_to_mongodb().await?;
-    let context = &Context::new(client);
+    let db = Db::connect().await?;
+    let app = Router::new()
+        .nest("/auth", auth_routes())
+        .layer(Extension(db));
 
-    let index = warp::path!().map(|| "Hello world!");
-
-    let all_filters = index.or(filters::auth::auth_filter(context));
-
-    warp::serve(all_filters.recover(rejection_handler))
-        .run(([0, 0, 0, 0], 3001))
-        .await;
+    let addr = SocketAddr::from(([127, 0, 0, 1], 3001));
+    log::info!("Listening on {}", addr);
+    Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 
     Ok(())
 }
