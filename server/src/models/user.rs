@@ -4,15 +4,16 @@ use axum::{
     http::StatusCode,
 };
 use chrono::{DateTime, Utc};
+use mongodb::bson::{doc, oid::ObjectId};
 use serde::{Deserialize, Serialize};
 
-use crate::mongo::{DatabaseError, Db};
+use crate::mongo::{oid_as_string, DatabaseError, Db, ToObjectId};
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
-    #[serde(rename = "_id")]
-    pub id: String,
+    #[serde(rename(deserialize = "_id"), serialize_with = "oid_as_string")]
+    pub id: ObjectId,
     pub email: String,
     pub name: String,
     pub image: String,
@@ -33,7 +34,7 @@ pub struct CreateUser {
 #[derive(Clone)]
 pub struct UserRepo(Db);
 impl UserRepo {
-    pub async fn create(&self, data: CreateUser) -> anyhow::Result<User, DatabaseError> {
+    pub async fn create(&self, data: CreateUser) -> Result<User, DatabaseError> {
         self.0
             .collection::<CreateUser>("users")
             .insert_one(&data, None)
@@ -42,16 +43,35 @@ impl UserRepo {
                 DatabaseError(
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Error creating User",
-                    Box::new(err),
+                    Some(Box::new(err)),
                 )
             })
             .map(|res| User {
-                id: res.inserted_id.as_object_id().unwrap().to_string(),
+                id: res.inserted_id.as_object_id().unwrap(),
                 email: data.email,
                 name: data.name,
                 image: data.image,
                 email_verified: data.email_verified,
                 access_token: data.access_token,
+            })
+    }
+
+    pub async fn get_user_by_id(&self, id: &String) -> Result<Option<User>, DatabaseError> {
+        self.0
+            .collection::<User>("users")
+            .find_one(
+                doc! {
+                    "_id": id.to_object_id()?
+                },
+                None,
+            )
+            .await
+            .map_err(|err| {
+                DatabaseError(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Error getting user",
+                    Some(Box::new(err)),
+                )
             })
     }
 }

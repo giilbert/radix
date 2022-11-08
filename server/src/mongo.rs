@@ -6,7 +6,12 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use mongodb::{bson::doc, options::ClientOptions, Client, Collection, Database};
+use mongodb::{
+    bson::{doc, oid::ObjectId},
+    options::ClientOptions,
+    Client, Database,
+};
+use serde::Serializer;
 
 #[derive(Clone)]
 pub struct Db {
@@ -58,11 +63,36 @@ where
     }
 }
 
-pub struct DatabaseError(pub StatusCode, pub &'static str, pub Box<dyn Error>);
+pub struct DatabaseError(pub StatusCode, pub &'static str, pub Option<Box<dyn Error>>);
 
 impl IntoResponse for DatabaseError {
     fn into_response(self) -> Response {
-        log::error!("Database Error: {}", self.2);
+        if let Some(err) = self.2 {
+            log::error!("Database Error: {}", err);
+        }
         (self.0, self.1).into_response()
     }
+}
+
+pub trait ToObjectId {
+    fn to_object_id(&self) -> Result<ObjectId, DatabaseError>;
+}
+
+impl ToObjectId for String {
+    fn to_object_id(&self) -> Result<ObjectId, DatabaseError> {
+        ObjectId::parse_str(self.as_str()).map_err(|err| {
+            DatabaseError(
+                StatusCode::BAD_REQUEST,
+                "Not an ObjectId",
+                Some(Box::new(err)),
+            )
+        })
+    }
+}
+
+pub fn oid_as_string<S>(oid: &ObjectId, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&oid.to_string())
 }

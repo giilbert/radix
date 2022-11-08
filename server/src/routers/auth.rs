@@ -1,4 +1,9 @@
-use axum::{routing::post, Json, Router};
+use axum::{
+    extract::Path,
+    http::StatusCode,
+    routing::{get, post},
+    Json, Router,
+};
 
 use crate::{
     models::user::{CreateUser, User, UserRepo},
@@ -6,7 +11,9 @@ use crate::{
 };
 
 pub fn auth_routes() -> Router {
-    Router::new().route("/create", post(create_user))
+    Router::new()
+        .route("/user", post(create_user))
+        .route("/user/:id", get(get_user_by_id))
 }
 
 async fn create_user(
@@ -15,4 +22,16 @@ async fn create_user(
 ) -> Result<Json<User>, DatabaseError> {
     let user = user_repo.create(data).await?;
     Ok(Json(user))
+}
+
+async fn get_user_by_id(
+    user_repo: UserRepo,
+    Path(id): Path<String>,
+) -> Result<Json<User>, DatabaseError> {
+    let user = user_repo.get_user_by_id(&id).await?;
+
+    match user {
+        Some(user) => Ok(Json(user)),
+        None => Err(DatabaseError(StatusCode::NOT_FOUND, "Not found", None)),
+    }
 }
