@@ -1,5 +1,6 @@
 use std::{error::Error, ops::Deref};
 
+use crate::errors::{DatabaseErr, RouteErr};
 use axum::{
     async_trait,
     extract::{FromRequest, RequestParts},
@@ -63,30 +64,14 @@ where
     }
 }
 
-pub struct DatabaseError(pub StatusCode, pub &'static str, pub Option<Box<dyn Error>>);
-
-impl IntoResponse for DatabaseError {
-    fn into_response(self) -> Response {
-        if let Some(err) = self.2 {
-            log::error!("Database Error: {}", err);
-        }
-        (self.0, self.1).into_response()
-    }
-}
-
 pub trait ToObjectId {
-    fn to_object_id(&self) -> Result<ObjectId, DatabaseError>;
+    fn to_object_id(&self) -> Result<ObjectId, RouteErr>;
 }
 
 impl ToObjectId for String {
-    fn to_object_id(&self) -> Result<ObjectId, DatabaseError> {
-        ObjectId::parse_str(self.as_str()).map_err(|err| {
-            DatabaseError(
-                StatusCode::BAD_REQUEST,
-                "Not an ObjectId",
-                Some(Box::new(err)),
-            )
-        })
+    fn to_object_id(&self) -> Result<ObjectId, RouteErr> {
+        ObjectId::parse_str(self.as_str())
+            .map_err(|_| RouteErr::Msg(StatusCode::BAD_REQUEST, "Not an ObjectId".to_string()))
     }
 }
 

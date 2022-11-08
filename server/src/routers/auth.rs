@@ -1,13 +1,14 @@
 use axum::{
     extract::Path,
     http::StatusCode,
+    response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
 
 use crate::{
+    errors::{DatabaseErr, ErrMsg, RouteErr},
     models::user::{CreateUser, User, UserRepo},
-    mongo::DatabaseError,
 };
 
 pub fn auth_routes() -> Router {
@@ -19,7 +20,7 @@ pub fn auth_routes() -> Router {
 async fn create_user(
     user_repo: UserRepo,
     Json(data): Json<CreateUser>,
-) -> Result<Json<User>, DatabaseError> {
+) -> Result<Json<User>, RouteErr> {
     let user = user_repo.create(data).await?;
     Ok(Json(user))
 }
@@ -27,11 +28,14 @@ async fn create_user(
 async fn get_user_by_id(
     user_repo: UserRepo,
     Path(id): Path<String>,
-) -> Result<Json<User>, DatabaseError> {
+) -> Result<Json<User>, RouteErr> {
     let user = user_repo.get_user_by_id(&id).await?;
 
     match user {
         Some(user) => Ok(Json(user)),
-        None => Err(DatabaseError(StatusCode::NOT_FOUND, "Not found", None)),
+        None => Err(RouteErr::Msg(
+            StatusCode::NOT_FOUND,
+            "Not found".to_string(),
+        )),
     }
 }
