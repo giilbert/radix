@@ -1,10 +1,9 @@
-mod errors;
 mod models;
-mod mongo;
 mod routers;
+mod utils;
 
-use mongo::Db;
 use std::net::SocketAddr;
+pub use utils::{errors, mongo};
 
 use axum::{Extension, Router, Server};
 
@@ -14,7 +13,7 @@ use crate::routers::auth::auth_routes;
 async fn main() -> anyhow::Result<()> {
     pretty_env_logger::init();
 
-    let db = Db::connect().await?;
+    let db = mongo::Db::connect().await?;
     let app = Router::new()
         .nest("/auth", auth_routes())
         .layer(Extension(db));

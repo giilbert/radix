@@ -44,30 +44,30 @@ pub struct CreateUser {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Account {
-    provider: String,
-    provider_type: String,
-    provider_account_id: String,
-    access_token: String,
-    expires_at: u32,
-    scope: String,
-    token_type: String,
-    id_token: String,
-    user_id: String,
+    pub provider: String,
+    pub provider_type: String,
+    pub provider_account_id: String,
+    pub access_token: String,
+    pub expires_at: u32,
+    pub scope: String,
+    pub token_type: String,
+    pub id_token: String,
+    pub user_id: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Session {
-    session_token: String,
-    user_id: String,
-    expires: DateTime<Utc>,
+    pub session_token: String,
+    pub user_id: String,
+    pub expires: DateTime<Utc>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionAndUser {
-    session: Session,
-    user: User,
+    pub session: Session,
+    pub user: User,
 }
 
 #[derive(Clone)]

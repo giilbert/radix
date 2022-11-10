@@ -8,6 +8,7 @@ use axum::{
 use crate::{
     errors::RouteErr,
     models::user::{Account, CreateUser, Session, SessionAndUser, User, UserRepo},
+    utils::auth::verify_user,
 };
 
 pub fn auth_routes() -> Router {
@@ -27,12 +28,22 @@ pub fn auth_routes() -> Router {
         .route("/link-account", post(link_account))
 }
 
+// TODO: verify that access token is valid
 async fn create_user(
     user_repo: UserRepo,
     Json(data): Json<CreateUser>,
 ) -> Result<Json<User>, RouteErr> {
-    let user = user_repo.create(data).await?;
-    Ok(Json(user))
+    let verified = verify_user(&data.access_token).await?;
+
+    if verified {
+        let user = user_repo.create(data).await?;
+        Ok(Json(user))
+    } else {
+        Err(RouteErr::Msg(
+            StatusCode::BAD_REQUEST,
+            "Invalid access token.".into(),
+        ))
+    }
 }
 
 async fn get_user_by_id(
@@ -86,6 +97,15 @@ async fn link_account(
     user_repo: UserRepo,
     Json(data): Json<Account>,
 ) -> Result<Json<User>, RouteErr> {
+    let verified = verify_user(&data.access_token).await?;
+
+    if !verified {
+        return Err(RouteErr::Msg(
+            StatusCode::BAD_REQUEST,
+            "Invalid access token.".into(),
+        ));
+    }
+
     let user = user_repo.create_user_account(&data).await?;
 
     match user {
