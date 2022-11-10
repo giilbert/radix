@@ -1,20 +1,30 @@
 use axum::{
     extract::Path,
     http::StatusCode,
-    response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
 
 use crate::{
-    errors::{DatabaseErr, ErrMsg, RouteErr},
-    models::user::{CreateUser, User, UserRepo},
+    errors::RouteErr,
+    models::user::{Account, CreateUser, Session, SessionAndUser, User, UserRepo},
 };
 
 pub fn auth_routes() -> Router {
     Router::new()
         .route("/user", post(create_user))
         .route("/user/:id", get(get_user_by_id))
+        .route("/user-email/:email", get(get_user_by_email))
+        .route(
+            "/user-account/:provider/:provider_account_id",
+            get(get_user_by_account),
+        )
+        .route(
+            "/session/:session_token",
+            get(get_session_and_user).delete(delete_session),
+        )
+        .route("/session", post(create_session))
+        .route("/link-account", post(link_account))
 }
 
 async fn create_user(
@@ -38,4 +48,79 @@ async fn get_user_by_id(
             "Not found".to_string(),
         )),
     }
+}
+
+async fn get_user_by_email(
+    user_repo: UserRepo,
+    Path(email): Path<String>,
+) -> Result<Json<User>, RouteErr> {
+    let user = user_repo.get_user_by_email(&email).await?;
+
+    match user {
+        Some(user) => Ok(Json(user)),
+        None => Err(RouteErr::Msg(
+            StatusCode::NOT_FOUND,
+            "Not found".to_string(),
+        )),
+    }
+}
+
+async fn get_user_by_account(
+    user_repo: UserRepo,
+    Path((provider, provider_account_id)): Path<(String, String)>,
+) -> Result<Json<User>, RouteErr> {
+    let user = user_repo
+        .get_user_by_account_id(&provider, &provider_account_id)
+        .await?;
+
+    match user {
+        Some(user) => Ok(Json(user)),
+        None => Err(RouteErr::Msg(
+            StatusCode::NOT_FOUND,
+            "Not found".to_string(),
+        )),
+    }
+}
+
+async fn link_account(
+    user_repo: UserRepo,
+    Json(data): Json<Account>,
+) -> Result<Json<User>, RouteErr> {
+    let user = user_repo.create_user_account(&data).await?;
+
+    match user {
+        Some(user) => Ok(Json(user)),
+        None => Err(RouteErr::Msg(
+            StatusCode::NOT_FOUND,
+            "Not found".to_string(),
+        )),
+    }
+}
+
+async fn get_session_and_user(
+    user_repo: UserRepo,
+    Path(session_token): Path<String>,
+) -> Result<Json<SessionAndUser>, RouteErr> {
+    let session_and_user = user_repo.get_session_and_user(&session_token).await?;
+
+    match session_and_user {
+        Some(session_and_user) => Ok(Json(session_and_user)),
+        None => Err(RouteErr::Msg(
+            StatusCode::NOT_FOUND,
+            "Not found".to_string(),
+        )),
+    }
+}
+
+async fn create_session(user_repo: UserRepo, Json(data): Json<Session>) -> Result<(), RouteErr> {
+    user_repo.create_user_session(&data).await?;
+    Ok(())
+}
+
+async fn delete_session(
+    user_repo: UserRepo,
+    Path(session_token): Path<String>,
+) -> Result<(), RouteErr> {
+    user_repo.delete_session(&session_token).await?;
+    Ok(())
 }

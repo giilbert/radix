@@ -1,6 +1,7 @@
 use std::error::Error;
 
 use axum::{http::StatusCode, response::IntoResponse, Json};
+use mongodb::results::DeleteResult;
 use serde::Serialize;
 
 // pub type RouteErr = (StatusCode, Json<ErrorResponseMessage>);
@@ -39,6 +40,30 @@ impl<T> ConvertResult<T> for Result<T, mongodb::error::Error> {
     fn convert(self, msg: Option<impl ToString>) -> Result<T, RouteErr> {
         self.map_err(|err| {
             log::error!("MongoDB Error: {}", err);
+            RouteErr::Db(
+                msg.map(|msg| msg.to_string())
+                    .unwrap_or_else(|| "An error occurred.".to_string()),
+            )
+        })
+    }
+}
+
+impl<T> ConvertResult<T> for Option<T> {
+    fn convert(self, msg: Option<impl ToString>) -> Result<T, RouteErr> {
+        self.ok_or_else(|| {
+            RouteErr::Msg(
+                StatusCode::NOT_FOUND,
+                msg.map(|msg| msg.to_string())
+                    .unwrap_or_else(|| "Not found.".to_string()),
+            )
+        })
+    }
+}
+
+impl<T> ConvertResult<T> for Result<T, DeleteResult> {
+    fn convert(self, msg: Option<impl ToString>) -> Result<T, RouteErr> {
+        self.map_err(|err| {
+            log::error!("MongoDB Error: {:#?}", err);
             RouteErr::Db(
                 msg.map(|msg| msg.to_string())
                     .unwrap_or_else(|| "An error occurred.".to_string()),

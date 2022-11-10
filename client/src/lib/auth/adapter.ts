@@ -1,59 +1,99 @@
+import { axios } from "@/utils/axios";
 import { Adapter } from "next-auth/adapters";
 
 export function CustomAdapter(): Adapter {
   return {
-    createSession: async (session) => {
-      return {
-        expires: new Date(),
-        sessionToken: "asdsd",
-        userId: "asdsd",
-      };
-    },
-
     createUser: async (user) => {
-      return {
-        email: "email",
-        emailVerified: null,
-        id: "Asdsad",
-        image: "asds",
-        name: "asd",
-      };
+      console.log("createUser", user);
+      const res = await axios.post("auth/user", {
+        ...user,
+        accounts: [],
+        sessions: [],
+      });
+      return res.data;
     },
 
-    deleteSession: async (session) => {
-      return {};
-    },
-
-    getUser: (id) => {
+    getUser: async (id) => {
+      console.log("getUser", id);
+      const res = await axios.post("auth/user/" + id);
+      if (res.status === 200) return res.data;
+      console.error(res.data);
       return null;
     },
 
-    /*
+    getUserByEmail: async (email) => {
+      console.log("getUserByEmail", email);
+      const res = await axios.get("auth/user-email/" + email);
+      if (res.status === 200) return res.data;
+      console.error(res.data);
+      return null;
+    },
 
-    createUser: (user: Omit<AdapterUser, "id">) => Awaitable<AdapterUser>;
-    getUser: (id: string) => Awaitable<AdapterUser | null>;
-    getUserByEmail: (email: string) => Awaitable<AdapterUser | null>;
-    getUserByAccount: (providerAccountId: Pick<AdapterAccount, "provider" | "providerAccountId">) => Awaitable<AdapterUser | null>;
-    updateUser: (user: Partial<AdapterUser>) => Awaitable<AdapterUser>;
-    deleteUser?: (userId: string) => Promise<void> | Awaitable<AdapterUser | null | undefined>;
-    linkAccount: (account: AdapterAccount) => Promise<void> | Awaitable<AdapterAccount | null | undefined>;
-    unlinkAccount?: (providerAccountId: Pick<AdapterAccount, "provider" | "providerAccountId">) => Promise<void> | Awaitable<AdapterAccount | undefined>;
-    createSession: (session: {
-        sessionToken: string;
-        userId: string;
-        expires: Date;
-    }) => Awaitable<AdapterSession>;
-    getSessionAndUser: (sessionToken: string) => Awaitable<{
-        session: AdapterSession;
-        user: AdapterUser;
-    } | null>;
-    updateSession: (session: Partial<AdapterSession> & Pick<AdapterSession, "sessionToken">) => Awaitable<AdapterSession | null | undefined>;
-    deleteSession: (sessionToken: string) => Promise<void> | Awaitable<AdapterSession | null | undefined>;
-    createVerificationToken?: (verificationToken: VerificationToken) => Awaitable<VerificationToken | null | undefined>;
-    useVerificationToken?: (params: {
-        identifier: string;
-        token: string;
-    }) => Awaitable<VerificationToken | null>;
-*/
+    getUserByAccount: async (account) => {
+      console.log("getUserByAccount", account);
+      const res = await axios.get(
+        "auth/user-account/" +
+          account.provider +
+          "/" +
+          account.providerAccountId
+      );
+      if (res.status === 200) return res.data;
+      console.error(res.data);
+
+      return null;
+    },
+
+    linkAccount: async (acc) => {
+      const data = {
+        userId: acc.userId,
+        provider: acc.provider,
+        providerAccountId: acc.providerAccountId,
+        providerType: acc.type,
+        accessToken: acc.access_token,
+        expiresAt: acc.expires_at,
+        scope: acc.scope,
+        tokenType: acc.token_type,
+        idToken: acc.id_token,
+      };
+
+      console.log("linkAccount", JSON.stringify(data));
+      await axios.post("auth/link-account", data);
+    },
+
+    createSession: async (session) => {
+      console.log("createSession", session);
+      await axios.post("auth/session", session);
+      return session;
+    },
+
+    getSessionAndUser: async (sessionToken: string) => {
+      console.log("getSessionAndUser", sessionToken);
+      const res = await axios.get("auth/session/" + sessionToken);
+      if (res.status === 404) return null;
+      if (!res.data) throw "Error fetching session and user";
+
+      return {
+        user: res.data.user,
+        session: {
+          ...res.data.session,
+          expires: new Date(res.data.session.expires),
+        },
+      };
+    },
+
+    deleteSession: async (sessionToken) => {
+      console.log("deleteSession", sessionToken);
+      const res = await axios.delete("auth/session/" + sessionToken);
+      if (res.status !== 200) throw "Error deleting session";
+    },
+
+    updateUser: async (user) => {
+      console.log("updateUser", user);
+      throw "unimplemented";
+    },
+
+    updateSession: async () => {
+      throw "unimplemented";
+    },
   };
 }

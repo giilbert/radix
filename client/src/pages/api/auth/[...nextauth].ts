@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
+import { GoogleProvider } from "@/lib/auth/provider";
+import { CustomAdapter } from "@/lib/auth/adapter";
 
 export default NextAuth({
   providers: [
@@ -8,4 +9,5 @@ export default NextAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
     }),
   ],
+  adapter: CustomAdapter(),
 });
