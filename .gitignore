@@ -34,3 +34,5 @@ next-env.d.ts
 target
 node_modules
 Cargo.lock
+
+piston-data
