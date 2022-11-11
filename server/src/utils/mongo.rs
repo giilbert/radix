@@ -34,7 +34,7 @@ impl Db {
 
         log::info!("Connected to database at {} successfully.", database_url);
 
-        let db = client.clone().database("hydra");
+        let db = client.clone().database("radix");
 
         Ok(Self { client, db })
     }
