@@ -1,10 +1,16 @@
-import { axios } from "@/utils/axios";
+import { BACKEND_URL } from "@/utils/consts";
+import defaultAxios from "axios";
 import { Adapter } from "next-auth/adapters";
+
+export const axios = defaultAxios.create({
+  baseURL: BACKEND_URL,
+  validateStatus: (status) => status >= 200 && status < 500,
+});
 
 export function CustomAdapter(): Adapter {
   return {
     createUser: async (user) => {
-      console.log("createUser", user);
+      // console.log("createUser", user);
       const res = await axios.post("auth/user", {
         ...user,
         accounts: [],
@@ -14,7 +20,7 @@ export function CustomAdapter(): Adapter {
     },
 
     getUser: async (id) => {
-      console.log("getUser", id);
+      // console.log("getUser", id);
       const res = await axios.post("auth/user/" + id);
       if (res.status === 200) return res.data;
       console.error(res.data);
@@ -22,7 +28,7 @@ export function CustomAdapter(): Adapter {
     },
 
     getUserByEmail: async (email) => {
-      console.log("getUserByEmail", email);
+      // console.log("getUserByEmail", email);
       const res = await axios.get("auth/user-email/" + email);
       if (res.status === 200) return res.data;
       console.error(res.data);
@@ -30,7 +36,7 @@ export function CustomAdapter(): Adapter {
     },
 
     getUserByAccount: async (account) => {
-      console.log("getUserByAccount", account);
+      // console.log("getUserByAccount", account);
       const res = await axios.get(
         "auth/user-account/" +
           account.provider +
@@ -56,18 +62,18 @@ export function CustomAdapter(): Adapter {
         idToken: acc.id_token,
       };
 
-      console.log("linkAccount", JSON.stringify(data));
+      // console.log("linkAccount", JSON.stringify(data));
       await axios.post("auth/link-account", data);
     },
 
     createSession: async (session) => {
-      console.log("createSession", session);
+      // console.log("createSession", session);
       await axios.post("auth/session", session);
       return session;
     },
 
     getSessionAndUser: async (sessionToken: string) => {
-      console.log("getSessionAndUser", sessionToken);
+      // console.log("getSessionAndUser", sessionToken);
       const res = await axios.get("auth/session/" + sessionToken);
       if (res.status === 404) return null;
       if (!res.data) throw "Error fetching session and user";
@@ -82,13 +88,13 @@ export function CustomAdapter(): Adapter {
     },
 
     deleteSession: async (sessionToken) => {
-      console.log("deleteSession", sessionToken);
+      // console.log("deleteSession", sessionToken);
       const res = await axios.delete("auth/session/" + sessionToken);
       if (res.status !== 200) throw "Error deleting session";
     },
 
     updateUser: async (user) => {
-      console.log("updateUser", user);
+      // console.log("updateUser", user);
       throw "unimplemented";
     },
 
