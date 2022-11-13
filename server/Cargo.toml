@@ -8,6 +8,8 @@ anyhow = "1.0.66"
 axum = "0.5.17"
 chrono = { version = "0.4.22", features = ["serde"] }
 dotenvy = "0.15.6"
+fred = "5.2.0"
+futures-util = "0.3.25"
 lazy_static = "1.4.0"
 log = "0.4.17"
 mongodb = "2.3.1"
