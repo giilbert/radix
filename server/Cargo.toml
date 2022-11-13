@@ -8,10 +8,12 @@ anyhow = "1.0.66"
 axum = "0.5.17"
 chrono = { version = "0.4.22", features = ["serde"] }
 dotenvy = "0.15.6"
+lazy_static = "1.4.0"
 log = "0.4.17"
 mongodb = "2.3.1"
 parking_lot = "0.12.1"
 pretty_env_logger = "0.4.0"
+regex = "1.7.0"
 reqwest = "0.11.12"
 serde = "1.0.147"
 tokio = { version = "1.21.2", features = ["full"] }

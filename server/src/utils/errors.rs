@@ -6,6 +6,7 @@ use serde::Serialize;
 
 // pub type RouteErr = (StatusCode, Json<ErrorResponseMessage>);
 
+#[derive(Clone, Debug)]
 pub enum RouteErr {
     Db(String),
     Msg(StatusCode, String),

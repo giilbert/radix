@@ -2,14 +2,14 @@ mod models;
 mod routers;
 mod utils;
 
-use reqwest::Method;
+use reqwest::{header, Method};
 use std::net::SocketAddr;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 pub use utils::{errors, mongo};
 
 use axum::{Extension, Router, Server};
 
-use crate::routers::auth::auth_routes;
+use crate::routers::{auth::auth_routes, rooms::room_routes};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -19,11 +19,17 @@ async fn main() -> anyhow::Result<()> {
 
     let cors_layer = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST, Method::DELETE])
-        .allow_headers(Any)
+        .allow_headers([
+            header::AUTHORIZATION,
+            header::CONTENT_TYPE,
+            header::CONTENT_LENGTH,
+        ])
+        .allow_credentials(true)
         .allow_origin(["http://localhost:3000".parse()?]);
 
     let app = Router::new()
         .nest("/auth", auth_routes())
+        .nest("/rooms", room_routes())
         .layer(Extension(db))
         .layer(cors_layer);
 

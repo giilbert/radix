@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use axum::{
     async_trait,
     extract::{FromRequest, RequestParts},
@@ -173,14 +175,14 @@ impl UserRepo {
 
     pub async fn get_session_and_user(
         &self,
-        session_token: &String,
+        session_token: impl AsRef<str>,
     ) -> Result<Option<SessionAndUser>, RouteErr> {
         let session_and_user = self
             .0
             .collection::<User>("users")
             .find_one(
                 doc! {
-                    "sessions.sessionToken": session_token
+                    "sessions.sessionToken": session_token.as_ref()
                 },
                 None,
             )
