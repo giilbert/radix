@@ -1,19 +1,14 @@
-use std::borrow::Borrow;
-
 use axum::{
     async_trait,
     extract::{FromRequest, RequestParts},
     http::StatusCode,
 };
 use chrono::{DateTime, Utc};
-use mongodb::{
-    bson::{self, doc, oid::ObjectId},
-    options::FindOneOptions,
-};
+use mongodb::bson::{self, doc, oid::ObjectId};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    errors::{ConvertResult, DatabaseErr, RouteErr},
+    errors::{ConvertResult, RouteErr},
     mongo::{oid_as_string, Db, ToObjectId},
 };
 

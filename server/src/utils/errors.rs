@@ -4,8 +4,6 @@ use axum::{http::StatusCode, response::IntoResponse, Json};
 use mongodb::results::DeleteResult;
 use serde::Serialize;
 
-// pub type RouteErr = (StatusCode, Json<ErrorResponseMessage>);
-
 #[derive(Clone, Debug)]
 pub enum RouteErr {
     Db(String),

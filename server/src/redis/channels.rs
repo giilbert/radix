@@ -54,10 +54,12 @@ pub trait ChannelsExt {
 impl ChannelsExt for Redis {
     async fn listen(&self, name: String) -> anyhow::Result<ChannelReceiver> {
         let (tx, rx) = mpsc::channel::<RedisValue>(256);
-        self.subscribe(&name).await?;
+        let channel_redis = self.channels_redis.as_ref().unwrap();
+        let channel_table = channel_redis.channel_table.as_ref().unwrap();
 
-        if self
-            .channel_table
+        channel_redis.subscribe(&name).await?;
+
+        if channel_table
             .write()
             .await
             .0
@@ -70,14 +72,15 @@ impl ChannelsExt for Redis {
         Ok(ChannelReceiver {
             inner: rx,
             key: name,
-            channel_table: self.channel_table.clone(),
-            redis: self.clone(),
+            channel_table: channel_table.clone(),
+            redis: channel_redis.as_ref().clone(),
         })
     }
 
     async fn run_channels(self) {
+        let channel_table = self.channel_table.as_ref().unwrap();
         while let Some((channel_name, message)) = self.on_message().next().await {
-            let channel_table = self.channel_table.read().await;
+            let channel_table = channel_table.read().await;
             if let Some(channel) = channel_table.0.get(&channel_name) {
                 if channel.send(message).await.is_err() {
                     log::error!("Error pushing message to channel {}", channel_name);

@@ -28,10 +28,9 @@ async fn main() -> anyhow::Result<()> {
     pretty_env_logger::init();
 
     let db = Db::connect().await?;
-    let redis = Redis::connect().await?;
+    let redis = Redis::connect(false).await?;
 
     let rx = redis.listen("hello".into()).await?;
-
     tokio::task::spawn(test(rx));
 
     let cors_layer = CorsLayer::new()
@@ -46,8 +45,9 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .nest("/auth", auth_routes())
-        .nest("/rooms", room_routes())
+        .nest("/room", room_routes())
         .layer(Extension(db))
+        .layer(Extension(redis))
         .layer(cors_layer);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3001));

@@ -1,11 +1,10 @@
-use std::{error::Error, ops::Deref};
+use std::ops::Deref;
 
-use crate::errors::{DatabaseErr, RouteErr};
+use crate::errors::RouteErr;
 use axum::{
     async_trait,
     extract::{FromRequest, RequestParts},
     http::StatusCode,
-    response::{IntoResponse, Response},
 };
 use mongodb::{
     bson::{doc, oid::ObjectId},

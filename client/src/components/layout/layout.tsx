@@ -8,11 +8,13 @@ export const Layout: React.FC<
   }>
 > = ({ title, children }) => (
   <>
-    <Head>{title}</Head>
+    <Head>
+      <title>{title}</title>
+    </Head>
 
     <Navbar />
 
-    <Center mt="20">
+    <Center mt="20" mx="4">
       <Box w="6xl">{children}</Box>
     </Center>
   </>

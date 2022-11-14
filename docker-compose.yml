@@ -24,6 +24,11 @@ services:
     networks:
       - mongo-network
 
+  redis:
+    image: redis
+    ports:
+      - 6379:6379
+
   piston:
     image: ghcr.io/engineer-man/piston
     container_name: piston_api

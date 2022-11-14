@@ -10,4 +10,15 @@ export default NextAuth({
     }),
   ],
   adapter: CustomAdapter(),
+  cookies: {
+    sessionToken: {
+      name: "next-auth.session-token",
+      options: {
+        httpOnly: false,
+        sameSite: "lax",
+        path: "/",
+        secure: true,
+      },
+    },
+  },
 });
