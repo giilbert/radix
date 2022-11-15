@@ -15,12 +15,9 @@ import {
   useDisclosure,
 } from "@chakra-ui/react";
 import type { NextPage } from "next";
-import { useEffect } from "react";
 
 const Home: NextPage = () => {
   const modalDisclosure = useDisclosure();
-
-  useEffect(() => {}, []);
 
   return (
     <Layout title="Radix">
@@ -28,7 +25,7 @@ const Home: NextPage = () => {
 
       <Button onClick={modalDisclosure.onOpen}>Create</Button>
 
-      <Modal {...modalDisclosure}>
+      <Modal {...modalDisclosure} size="lg">
         <ModalOverlay />
 
         <ModalContent>

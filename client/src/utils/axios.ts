@@ -10,6 +10,8 @@ axios.interceptors.response.use(
   (res) => res,
   (err) => {
     delete (err as any).stack;
+    err.message = (err.response.data as any).error;
+    err.code = err.response.statusText;
     throw err;
   }
 );

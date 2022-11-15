@@ -1,18 +1,22 @@
 import { useZodForm } from "@/lib/hooks/use-zod-form";
 import { axios } from "@/utils/axios";
 import {
+  Box,
   Button,
   Checkbox,
   FormControl,
   FormErrorMessage,
   FormLabel,
   Input,
+  Text,
   VStack,
 } from "@chakra-ui/react";
 import { useMutation } from "@tanstack/react-query";
+import { AxiosError } from "axios";
 import { useCallback } from "react";
 import { Controller } from "react-hook-form";
 import { z } from "zod";
+import { ErrorMessage } from "../ui/error-message";
 
 const SPECIAL_CHARACTERS_REGEX = /[^a-zA-Z0-9_-]/g;
 const formSchema = z.object({
@@ -27,14 +31,18 @@ export const CreateRoom: React.FC = () => {
     schema: formSchema,
   });
   const errors = form.formState.errors;
-  const createRoom = useMutation(["room"], (data: FormData) => {
-    return axios.post("/room", data);
-  });
+  const createRoom = useMutation<unknown, AxiosError, FormData>(
+    ["room"],
+    (data: FormData) => {
+      return axios.post("/room", data);
+    }
+  );
 
   const onSubmit = useCallback(
     async (values: FormData) => {
-      console.log(values);
-      createRoom.mutate(values);
+      try {
+        await createRoom.mutateAsync(values);
+      } catch {}
     },
     [createRoom]
   );
@@ -74,6 +82,8 @@ export const CreateRoom: React.FC = () => {
       <Button my="4" w="100%" type="submit" isLoading={createRoom.isLoading}>
         Create
       </Button>
+
+      <ErrorMessage error={createRoom.error} />
     </form>
   );
 };
