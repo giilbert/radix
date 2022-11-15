@@ -4,6 +4,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use serde::{Deserialize, Serialize};
 
 use crate::{
     errors::RouteErr,
@@ -22,7 +23,9 @@ pub fn auth_routes() -> Router {
         )
         .route(
             "/session/:session_token",
-            get(get_session_and_user).delete(delete_session),
+            get(get_session_and_user)
+                .delete(delete_session)
+                .patch(update_session),
         )
         .route("/session", post(create_session))
         .route("/link-account", post(link_account))
@@ -143,4 +146,38 @@ async fn delete_session(
 ) -> Result<(), RouteErr> {
     user_repo.delete_session(&session_token).await?;
     Ok(())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateSession {
+    session_token: String,
+    expires: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateSessionResponse {
+    session_token: String,
+    expires: String,
+    user_id: String,
+}
+
+async fn update_session(
+    user_repo: UserRepo,
+    Json(data): Json<UpdateSession>,
+) -> Result<Json<UpdateSessionResponse>, RouteErr> {
+    user_repo
+        .update_session_expiry(&data.session_token, &data.expires)
+        .await?;
+    let session_and_user = user_repo
+        .get_session_and_user(&data.session_token)
+        .await?
+        .ok_or_else(|| RouteErr::Msg(StatusCode::NOT_FOUND, "Session not found.".into()))?;
+
+    Ok(Json(UpdateSessionResponse {
+        session_token: session_and_user.session.session_token,
+        expires: session_and_user.session.expires.to_string(),
+        user_id: session_and_user.user.id.to_string(),
+    }))
 }

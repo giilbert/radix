@@ -98,8 +98,12 @@ export function CustomAdapter(): Adapter {
       throw "unimplemented";
     },
 
-    updateSession: async () => {
-      throw "unimplemented";
+    updateSession: async (session) => {
+      console.log("updateSession", session);
+      if (!session.expires) throw "unimplemented";
+      return (
+        await axios.patch("auth/session/" + session.sessionToken, session)
+      ).data;
     },
   };
 }

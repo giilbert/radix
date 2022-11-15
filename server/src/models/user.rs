@@ -219,6 +219,31 @@ impl UserRepo {
 
         Ok(())
     }
+
+    pub async fn update_session_expiry(
+        &self,
+        session_token: impl AsRef<str>,
+        expires: &String,
+    ) -> Result<(), RouteErr> {
+        let data = self
+            .0
+            .collection::<User>("users")
+            .update_one(
+                doc! {
+                    "sessions.sessionToken": session_token.as_ref(),
+                },
+                doc! {
+                    "$set": {
+                        "sessions.$.expires": expires,
+                    }
+                },
+                None,
+            )
+            .await
+            .convert(None::<String>)?;
+
+        Ok(())
+    }
 }
 
 #[async_trait]
