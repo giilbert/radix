@@ -1,5 +1,6 @@
 mod models;
 mod redis;
+mod rooms;
 mod routers;
 mod utils;
 

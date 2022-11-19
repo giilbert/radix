@@ -67,7 +67,7 @@ export const CreateRoom: React.FC = () => {
                 }}
               />
             )}
-          ></Controller>
+          />
           <FormErrorMessage>{errors.name?.message}</FormErrorMessage>
         </FormControl>
 

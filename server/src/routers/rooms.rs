@@ -1,19 +1,17 @@
 use axum::{routing::post, Json, Router};
-use fred::prelude::SetsInterface;
+use fred::prelude::{KeysInterface, SetsInterface, TransactionInterface};
 use reqwest::StatusCode;
 use serde::Deserialize;
 
-use crate::{errors::RouteErr, models::user::User, redis::Redis};
+use crate::{
+    errors::RouteErr,
+    models::user::User,
+    redis::Redis,
+    rooms::room::{CreateRoom, Room},
+};
 
 pub fn room_routes() -> Router {
     Router::new().route("/", post(create_room))
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct CreateRoom {
-    name: String,
-    public: bool,
 }
 
 async fn create_room(
@@ -33,14 +31,8 @@ async fn create_room(
         ));
     }
 
-    let _: i32 = redis.sadd("rooms", &data.name).await.map_err(|_| {
-        RouteErr::Msg(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Error creating room.".into(),
-        )
-    })?;
-
-    log::info!("{:?}", data);
+    let room = Room::new(&redis, data, user);
+    tokio::task::spawn(room.run());
 
     Ok(())
 }
