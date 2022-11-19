@@ -31,7 +31,7 @@ pub async fn verify_user(token: &String) -> Result<bool, RouteErr> {
 
 lazy_static::lazy_static! {
     static ref SESSION_TOKEN_REGEX: Regex =
-        Regex::new("next-auth\\.session-token=(.+);?").unwrap();
+        Regex::new("next-auth\\.session-token=([a-zA-Z0-9\\-]+);?").unwrap();
 }
 
 #[async_trait]
