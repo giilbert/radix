@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.66"
 async-recursion = "1.0.0"
-axum = "0.5.17"
+axum = { version = "0.5.17", features = ["ws"] }
 chrono = { version = "0.4.22", features = ["serde"] }
 dotenvy = "0.15.6"
 fred = "5.2.0"

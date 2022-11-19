@@ -14,15 +14,10 @@ use axum::{Extension, Router, Server};
 
 use crate::{
     mongo::Db,
-    redis::{channels::ChannelsExt, Redis},
+    redis::Redis,
+    rooms::room::Rooms,
     routers::{auth::auth_routes, rooms::room_routes},
 };
-
-async fn test(mut chan: ChannelReceiver) {
-    if let Some(val) = chan.recv().await {
-        log::info!("recv: {}", val.as_string().unwrap());
-    }
-}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -31,8 +26,7 @@ async fn main() -> anyhow::Result<()> {
     let db = Db::connect().await?;
     let redis = Redis::connect(false).await?;
 
-    let rx = redis.listen("hello".into()).await?;
-    tokio::task::spawn(test(rx));
+    let rooms = Rooms::default();
 
     let cors_layer = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST, Method::DELETE])
@@ -49,6 +43,7 @@ async fn main() -> anyhow::Result<()> {
         .nest("/room", room_routes())
         .layer(Extension(db))
         .layer(Extension(redis))
+        .layer(Extension(rooms))
         .layer(cors_layer);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3001));

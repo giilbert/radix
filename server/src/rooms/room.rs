@@ -1,17 +1,42 @@
-use fred::prelude::{KeysInterface, SetsInterface, TransactionInterface};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
+
+use fred::prelude::{KeysInterface, PubsubInterface, SetsInterface, TransactionInterface};
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tokio::{
     select,
-    sync::mpsc,
+    sync::mpsc::{self, Sender},
     task::JoinHandle,
     time::{self, Duration},
 };
 
-use crate::{models::user::User, redis::Redis};
+use crate::{
+    models::user::User,
+    redis::{channels::ChannelsExt, Redis},
+};
 
+use super::connection::ConnectionCommands;
+
+pub type Rooms = Arc<Mutex<HashMap<String, Sender<RoomCommands>>>>;
+
+#[derive(Serialize, Deserialize, Debug)]
 pub enum RoomCommands {
     Ping,
     Stop,
+
+    // ids
+    AddConnection(String),
+    RemoveConnection(String),
+
+    ClientSent(String, ClientCommand),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum ClientCommand {
+    Ping,
 }
 
 #[derive(Deserialize, Debug)]
@@ -29,42 +54,36 @@ struct RoomData {
 }
 
 pub struct Room {
-    name: String,
-    public: bool,
-    owner: User,
+    pub name: String,
+    pub public: bool,
+    pub owner: User,
+    pub commands: Sender<RoomCommands>,
     rx: mpsc::Receiver<RoomCommands>,
-    commands: mpsc::Sender<RoomCommands>,
     redis: Redis,
+    connections: HashSet<String>,
+    deletion_timer: Option<JoinHandle<()>>,
 }
 
 impl Room {
     pub fn new(redis: &Redis, data: CreateRoom, owner: User) -> Self {
-        let (tx, rx) = mpsc::channel::<RoomCommands>(256);
+        let (commands, rx) = mpsc::channel::<RoomCommands>(256);
 
         Room {
             name: data.name,
             public: data.public,
             owner,
+            commands,
             rx,
-            commands: tx,
             redis: redis.clone(),
+            connections: HashSet::new(),
+            deletion_timer: None,
         }
     }
 
     pub async fn run(mut self) -> anyhow::Result<()> {
-        let commands = self.commands.clone();
-        let mut sleep_handle = Some(tokio::spawn(async move {
-            const FIVE_MINUTES: u64 = 10;
-            time::sleep(Duration::from_secs(FIVE_MINUTES)).await;
-            if let Err(err) = commands.send(RoomCommands::Stop).await {
-                log::error!("Error stopping room: {}", err);
-            };
-        }));
-
-        let redis = self.redis;
-
+        self.prime_deletion();
         {
-            let t = redis.multi(true).await?;
+            let t = self.redis.multi(true).await?;
             let _ = t.sadd::<i32, _, _>("rooms", &self.name).await;
             let _ = t
                 .set::<i32, _, _>(
@@ -83,27 +102,102 @@ impl Room {
             t.exec().await?;
         }
 
-        while let Some(command) = self.rx.recv().await {
-            use RoomCommands::*;
+        let mut chan = self.redis.listen(format!("room:{}", self.name)).await?;
+        loop {
+            select! {
+                Some(command) = chan.recv() => {
+                    let command = serde_json::from_str::<RoomCommands>(command.as_str().unwrap().as_ref()).unwrap();
 
-            match command {
-                Ping => log::info!("a"),
-                Stop => {
-                    break;
+                    if self.handle_command(command).await? {
+                        break;
+                    }
+                }
+
+                Some(command) = self.rx.recv() => {
+                    if self.handle_command(command).await? {
+                        break;
+                    }
                 }
             }
         }
 
         // cleanup
         {
-            let t = redis.multi(true).await?;
+            let t = self.redis.multi(true).await?;
             let _ = t.srem::<i32, _, _>("rooms", &self.name).await;
             let _ = t.del::<i32, _>(format!("room-{}", &self.name)).await;
             t.exec().await?;
         }
 
+        // stop all connections
+
         log::info!("Room {} stopped", self.name);
 
         Ok(())
+    }
+
+    async fn send_connection<T: Serialize>(
+        &mut self,
+        connection_id: &String,
+        data: T,
+    ) -> anyhow::Result<()> {
+        self.redis
+            .publish(
+                connection_id,
+                serde_json::to_string(&ConnectionCommands::Send(serde_json::to_string(&data)?))?,
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    async fn handle_command(&mut self, command: RoomCommands) -> anyhow::Result<bool> {
+        use RoomCommands::*;
+
+        match command {
+            Ping => log::info!("a"),
+            AddConnection(id) => {
+                self.connections.insert(id);
+                self.cancel_deletion();
+            }
+            RemoveConnection(id) => {
+                self.connections.remove(&id);
+                if self.connections.len() == 0 {
+                    self.prime_deletion();
+                }
+            }
+            Stop => {
+                return Ok(true);
+            }
+            ClientSent(id, data) => {
+                // log::info!("{} sent: {:?}", id, data);
+                match data {
+                    ClientCommand::Ping => {
+                        self.send_connection(&id, "Pong").await?;
+                    }
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
+    fn prime_deletion(&mut self) {
+        if self.deletion_timer.is_none() {
+            let commands = self.commands.clone();
+            self.deletion_timer = Some(tokio::spawn(async move {
+                const FIVE_MINUTES: u64 = 30;
+                time::sleep(Duration::from_secs(FIVE_MINUTES)).await;
+                if let Err(err) = commands.send(RoomCommands::Stop).await {
+                    log::error!("Error stopping room: {}", err);
+                };
+            }));
+        }
+    }
+
+    fn cancel_deletion(&mut self) {
+        if let Some(task) = self.deletion_timer.take() {
+            task.abort();
+        }
     }
 }
