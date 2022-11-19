@@ -4,9 +4,8 @@ use axum::{
     routing::{get, post},
     Extension, Json, Router,
 };
-use fred::prelude::{KeysInterface, PubsubInterface, SetsInterface, TransactionInterface};
+use fred::prelude::SetsInterface;
 use reqwest::StatusCode;
-use serde::Deserialize;
 
 use crate::{
     errors::RouteErr,
@@ -14,7 +13,8 @@ use crate::{
     redis::Redis,
     rooms::{
         connection::Connection,
-        room::{CreateRoom, Room, RoomCommands, Rooms},
+        proxies::room::RoomProxy,
+        room::{CreateRoom, Room, RoomCommands},
     },
 };
 
@@ -27,7 +27,6 @@ pub fn room_routes() -> Router {
 async fn create_room(
     redis: Redis,
     user: User,
-    Extension(rooms): Extension<Rooms>,
     Json(data): Json<CreateRoom>,
 ) -> Result<(), RouteErr> {
     // check if the room already exists
@@ -42,18 +41,12 @@ async fn create_room(
         ));
     }
 
-    // insert the room into the replica's directory of rooms
-    let name = data.name.clone();
+    // create and run the room
     let room = Room::new(&redis, data, user);
-    rooms.lock().insert(name.clone(), room.commands.clone());
-
-    // run the room
     tokio::task::spawn(async move {
         if let Err(err) = room.run().await {
             log::error!("Error running room: {:?}", err);
         }
-
-        rooms.lock().remove(&name);
     });
 
     Ok(())
@@ -80,17 +73,26 @@ async fn connect(
     }
 
     Ok(ws.on_upgrade(|ws| async move {
-        let conn = Connection::new(ws, user, room_name.clone(), redis.clone()).await;
-        if let Ok(conn) = conn {
-            let _: i32 = redis
-                .publish(
-                    format!("room:{}", room_name),
-                    serde_json::to_string(&RoomCommands::AddConnection(conn.id.to_string()))
-                        .unwrap(),
-                )
-                .await
-                .unwrap();
-            conn.run().await;
+        let conn = match Connection::new(ws, user, room_name.clone(), redis.clone()).await {
+            Ok(conn) => conn,
+            Err(err) => {
+                log::error!("Error creating connection: {:?}", err);
+                return;
+            }
+        };
+
+        let room_proxy = RoomProxy::new(redis.clone(), &room_name);
+
+        if let Err(err) = room_proxy
+            .send_command(&RoomCommands::AddConnection(conn.id.clone()))
+            .await
+        {
+            log::error!("Error notifying room of connection {:?}", err);
+            return;
+        }
+
+        if let Err(err) = conn.run().await {
+            log::error!("Error running connection: {:?}", err);
         }
     }))
 }

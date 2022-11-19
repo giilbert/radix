@@ -1,13 +1,11 @@
 use axum::extract::ws::{Message, WebSocket};
-use either::Either;
-use fred::prelude::PubsubInterface;
 use futures_util::{
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
 };
 use mongodb::bson::Uuid;
 use serde::{Deserialize, Serialize};
-use tokio::{select, sync::mpsc};
+use tokio::select;
 
 use crate::{
     models::user::User,
@@ -17,14 +15,16 @@ use crate::{
     },
 };
 
-use super::room::{ClientCommand, Room, RoomCommands};
+use super::{
+    proxies::room::RoomProxy,
+    room::{ClientSentCommand, RoomCommands},
+};
 
 pub struct Connection {
     ws_tx: SplitSink<WebSocket, Message>,
     ws_rx: SplitStream<WebSocket>,
-    redis: Redis,
-    room_name: String,
     redis_channel: ChannelReceiver,
+    room: RoomProxy,
     pub id: String,
     pub user: User,
 }
@@ -42,22 +42,23 @@ impl Connection {
         room_name: String,
         redis: Redis,
     ) -> anyhow::Result<Self> {
-        let id = Uuid::new();
-        let redis_channel = redis.listen(format!("connection:{}", id)).await?;
+        let id = format!("connection:{}", Uuid::new().to_string());
+        let redis_channel = redis.listen(id.clone()).await?;
         let (ws_tx, ws_rx) = ws.split();
+
+        let room = RoomProxy::new(redis, &room_name);
 
         Ok(Self {
             ws_tx,
             ws_rx,
-            redis,
-            room_name,
             redis_channel,
-            id: format!("connection:{}", id),
+            id,
+            room,
             user,
         })
     }
 
-    pub async fn run(mut self) {
+    pub async fn run(mut self) -> anyhow::Result<()> {
         loop {
             select! {
                 data = &mut self.ws_rx.next() => {
@@ -70,7 +71,6 @@ impl Connection {
                         None => break
                     };
 
-                    // log::info!("received message {:?}", data);
 
                     if let Err(err) = self.handle_message(data).await {
                         log::error!("Error handling message {}", err);
@@ -95,15 +95,11 @@ impl Connection {
             }
         }
 
-        let _: i32 = self
-            .redis
-            .publish(
-                format!("room:{}", self.room_name),
-                serde_json::to_string(&RoomCommands::RemoveConnection(self.id.to_string()))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
+        self.room
+            .send_command(&RoomCommands::RemoveConnection(self.id))
+            .await?;
+
+        Ok(())
     }
 
     async fn handle_command(&mut self, command: ConnectionCommands) -> bool {
@@ -124,16 +120,10 @@ impl Connection {
     async fn handle_message(&mut self, message: Message) -> anyhow::Result<()> {
         match message {
             Message::Text(string) => {
-                let data = serde_json::from_str::<ClientCommand>(&string)?;
-                self.redis
-                    .publish(
-                        format!("room:{}", self.room_name),
-                        serde_json::to_string(&RoomCommands::ClientSent(
-                            self.id.to_string(),
-                            data,
-                        ))?,
-                    )
-                    .await?
+                let data = serde_json::from_str::<ClientSentCommand>(&string)?;
+                self.room
+                    .send_command(&RoomCommands::ClientSent(self.id.clone(), data))
+                    .await?;
             }
             _ => (),
         }

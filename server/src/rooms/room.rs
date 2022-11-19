@@ -1,11 +1,6 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
-
 use fred::prelude::{KeysInterface, PubsubInterface, SetsInterface, TransactionInterface};
-use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use tokio::{
     select,
     sync::mpsc::{self, Sender},
@@ -20,8 +15,6 @@ use crate::{
 
 use super::connection::ConnectionCommands;
 
-pub type Rooms = Arc<Mutex<HashMap<String, Sender<RoomCommands>>>>;
-
 #[derive(Serialize, Deserialize, Debug)]
 pub enum RoomCommands {
     Ping,
@@ -31,11 +24,11 @@ pub enum RoomCommands {
     AddConnection(String),
     RemoveConnection(String),
 
-    ClientSent(String, ClientCommand),
+    ClientSent(String, ClientSentCommand),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub enum ClientCommand {
+pub enum ClientSentCommand {
     Ping,
 }
 
@@ -87,7 +80,7 @@ impl Room {
             let _ = t.sadd::<i32, _, _>("rooms", &self.name).await;
             let _ = t
                 .set::<i32, _, _>(
-                    format!("room-{}", &self.name),
+                    format!("room:{}", &self.name),
                     serde_json::to_string(&RoomData {
                         public: self.public,
                         name: self.name.clone(),
@@ -106,7 +99,12 @@ impl Room {
         loop {
             select! {
                 Some(command) = chan.recv() => {
-                    let command = serde_json::from_str::<RoomCommands>(command.as_str().unwrap().as_ref()).unwrap();
+                    let command = serde_json::from_str::<RoomCommands>(
+                        command
+                            .as_str()
+                            .ok_or_else(|| anyhow::anyhow!("Command send not deserializable"))?
+                            .as_ref(),
+                    )?;
 
                     if self.handle_command(command).await? {
                         break;
@@ -125,7 +123,7 @@ impl Room {
         {
             let t = self.redis.multi(true).await?;
             let _ = t.srem::<i32, _, _>("rooms", &self.name).await;
-            let _ = t.del::<i32, _>(format!("room-{}", &self.name)).await;
+            let _ = t.del::<i32, _>(format!("room:{}", &self.name)).await;
             t.exec().await?;
         }
 
@@ -169,14 +167,11 @@ impl Room {
             Stop => {
                 return Ok(true);
             }
-            ClientSent(id, data) => {
-                // log::info!("{} sent: {:?}", id, data);
-                match data {
-                    ClientCommand::Ping => {
-                        self.send_connection(&id, "Pong").await?;
-                    }
+            ClientSent(id, data) => match data {
+                ClientSentCommand::Ping => {
+                    self.send_connection(&id, "Pong").await?;
                 }
-            }
+            },
         }
 
         Ok(false)
