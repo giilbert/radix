@@ -33,9 +33,11 @@ impl Drop for ChannelReceiver {
         let channel_table = self.channel_table.clone();
         let redis = self.redis.clone();
         tokio::task::spawn(async move {
+            log::info!("attempting channel table lock {}", key);
             channel_table.write().await.0.remove(&key);
-            if redis.unsubscribe(&key).await.is_err() {
-                log::error!("Error unsubscribing from channel: {}", key);
+            log::info!("got channel table lock");
+            if let Err(err) = redis.unsubscribe(&key).await {
+                log::error!("Error unsubscribing from channel {}: {:?}", key, err);
             }
         });
     }

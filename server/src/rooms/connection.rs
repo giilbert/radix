@@ -41,9 +41,12 @@ impl Connection {
         user: User,
         room_name: String,
         redis: Redis,
-    ) -> anyhow::Result<Self> {
+    ) -> Result<Self, (WebSocket, anyhow::Error)> {
         let id = format!("connection:{}", Uuid::new().to_string());
-        let redis_channel = redis.listen(id.clone()).await?;
+        let redis_channel = match redis.listen(id.clone()).await {
+            Ok(chan) => chan,
+            Err(err) => return Err((ws, err)),
+        };
         let (ws_tx, ws_rx) = ws.split();
 
         let room = RoomProxy::new(redis, &room_name);
@@ -102,7 +105,7 @@ impl Connection {
         Ok(())
     }
 
-    async fn handle_command(&mut self, command: ConnectionCommands) -> bool {
+    pub async fn handle_command(&mut self, command: ConnectionCommands) -> bool {
         use ConnectionCommands::*;
 
         match command {

@@ -16,6 +16,7 @@ use crate::{
         proxies::room::RoomProxy,
         room::{CreateRoom, Room, RoomCommands},
     },
+    Rooms,
 };
 
 pub fn room_routes() -> Router {
@@ -27,6 +28,7 @@ pub fn room_routes() -> Router {
 async fn create_room(
     redis: Redis,
     user: User,
+    Extension(rooms): Extension<Rooms>,
     Json(data): Json<CreateRoom>,
 ) -> Result<(), RouteErr> {
     // check if the room already exists
@@ -42,11 +44,17 @@ async fn create_room(
     }
 
     // create and run the room
+    let room_name = data.name.clone();
     let room = Room::new(&redis, data, user);
+    rooms
+        .lock()
+        .insert(room_name.clone(), room.commands.clone());
     tokio::task::spawn(async move {
         if let Err(err) = room.run().await {
             log::error!("Error running room: {:?}", err);
         }
+
+        rooms.lock().remove(&room_name);
     });
 
     Ok(())
@@ -58,8 +66,6 @@ async fn connect(
     redis: Redis,
     Path(room_name): Path<String>,
 ) -> Result<Response, RouteErr> {
-    log::info!("User connected.");
-
     // check if the room to connect to exists
     let exists: i32 = redis.sismember("rooms", &room_name).await.map_err(|e| {
         log::error!("{:?}", e);
@@ -73,9 +79,13 @@ async fn connect(
     }
 
     Ok(ws.on_upgrade(|ws| async move {
+        let user_id = user.id.clone();
+        log::info!("WebSocket connected: uid {}", user_id);
+
         let conn = match Connection::new(ws, user, room_name.clone(), redis.clone()).await {
             Ok(conn) => conn,
-            Err(err) => {
+            Err((ws, err)) => {
+                let _ = ws.close().await;
                 log::error!("Error creating connection: {:?}", err);
                 return;
             }
@@ -94,5 +104,7 @@ async fn connect(
         if let Err(err) = conn.run().await {
             log::error!("Error running connection: {:?}", err);
         }
+
+        log::info!("WebSocket disconnected: uid {}", user_id);
     }))
 }
