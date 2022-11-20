@@ -13,6 +13,7 @@ import {
 } from "@chakra-ui/react";
 import { useMutation } from "@tanstack/react-query";
 import { AxiosError } from "axios";
+import { useRouter } from "next/router";
 import { useCallback } from "react";
 import { Controller } from "react-hook-form";
 import { z } from "zod";
@@ -42,6 +43,7 @@ export const CreateRoom: React.FC = () => {
     async (values: FormData) => {
       try {
         await createRoom.mutateAsync(values);
+        window.location.href = `/room/${values.name}`;
       } catch {}
     },
     [createRoom]
