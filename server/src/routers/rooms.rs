@@ -13,7 +13,7 @@ use crate::{
     redis::Redis,
     rooms::{
         connection::Connection,
-        proxies::room::RoomProxy,
+        proxies::room::{PartialUser, RoomProxy},
         room::{CreateRoom, Room, RoomCommands},
     },
     Rooms,
@@ -49,6 +49,7 @@ async fn create_room(
     rooms
         .lock()
         .insert(room_name.clone(), room.commands.clone());
+
     tokio::task::spawn(async move {
         if let Err(err) = room.run().await {
             log::error!("Error running room: {:?}", err);
@@ -78,11 +79,26 @@ async fn connect(
         ));
     }
 
+    let room_proxy = RoomProxy::new(redis.clone(), &room_name);
+    if room_proxy
+        .does_user_exist(&PartialUser {
+            id: user.id.to_string(),
+            name: user.name.clone(),
+        })
+        .await
+        .unwrap_or(false)
+    {
+        return Err(RouteErr::Msg(
+            StatusCode::FORBIDDEN,
+            "You are already in this room.".into(),
+        ));
+    };
+
     Ok(ws.on_upgrade(|ws| async move {
         let user_id = user.id.clone();
         log::info!("WebSocket connected: uid {}", user_id);
 
-        let conn = match Connection::new(ws, user, room_name.clone(), redis.clone()).await {
+        let conn = match Connection::new(ws, user.clone(), room_name.clone(), redis.clone()).await {
             Ok(conn) => conn,
             Err((ws, err)) => {
                 let _ = ws.close().await;
@@ -91,10 +107,12 @@ async fn connect(
             }
         };
 
-        let room_proxy = RoomProxy::new(redis.clone(), &room_name);
-
         if let Err(err) = room_proxy
-            .send_command(&RoomCommands::AddConnection(conn.id.clone()))
+            .send_command(&RoomCommands::AddConnection(
+                conn.id.clone(),
+                user.id.to_string(),
+                user.name,
+            ))
             .await
         {
             log::error!("Error notifying room of connection {:?}", err);

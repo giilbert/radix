@@ -1,6 +1,6 @@
 use fred::prelude::{KeysInterface, PubsubInterface, SetsInterface, TransactionInterface};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use tokio::{
     select,
     sync::mpsc::{self, Sender},
@@ -11,25 +11,38 @@ use tokio::{
 use crate::{
     models::user::User,
     redis::{channels::ChannelsExt, Redis},
+    rooms::proxies::room::PartialUser,
 };
 
-use super::connection::ConnectionCommands;
+use super::{
+    chat::{Chat, ChatMessage},
+    connection::ConnectionCommands,
+    proxies::room::RoomProxy,
+};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum RoomCommands {
-    Ping,
     Stop,
 
-    // ids
-    AddConnection(String),
-    RemoveConnection(String),
+    // (connection_id, user_id, name)
+    AddConnection(String, String, String),
+    RemoveConnection(String, String, String),
 
     ClientSent(String, ClientSentCommand),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "t", content = "c")]
 pub enum ClientSentCommand {
     Ping,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "t", content = "c")]
+pub enum ServerSentCommand {
+    Pong,
+    ChatHistory(Vec<ChatMessage>),
+    ChatMessage(ChatMessage),
 }
 
 #[derive(Deserialize, Debug)]
@@ -51,24 +64,30 @@ pub struct Room {
     pub public: bool,
     pub owner: User,
     pub commands: Sender<RoomCommands>,
+    chat: Chat,
     rx: mpsc::Receiver<RoomCommands>,
     redis: Redis,
-    connections: HashSet<String>,
+    proxy: RoomProxy,
+    // conn_id => (user_id, name)
+    connections: HashMap<String, (String, String)>,
     deletion_timer: Option<JoinHandle<()>>,
 }
 
 impl Room {
     pub fn new(redis: &Redis, data: CreateRoom, owner: User) -> Self {
         let (commands, rx) = mpsc::channel::<RoomCommands>(256);
+        let chat = Chat::new(redis.clone(), format!("room:{}", data.name));
 
         Room {
+            proxy: RoomProxy::new(redis.clone(), &data.name),
             name: data.name,
             public: data.public,
             owner,
             commands,
+            chat,
             rx,
             redis: redis.clone(),
-            connections: HashSet::new(),
+            connections: HashMap::new(),
             deletion_timer: None,
         }
     }
@@ -124,6 +143,11 @@ impl Room {
             let t = self.redis.multi(true).await?;
             let _ = t.srem::<i32, _, _>("rooms", &self.name).await;
             let _ = t.del::<i32, _>(format!("room:{}", &self.name)).await;
+            let _ = t.del::<i32, _>(format!("room:{}:chat", &self.name)).await;
+            let _ = t.del::<i32, _>(format!("room:{}:users", &self.name)).await;
+            let _ = t
+                .del::<i32, _>(format!("room:{}:connections", &self.name))
+                .await;
             t.exec().await?;
         }
 
@@ -153,25 +177,58 @@ impl Room {
         use RoomCommands::*;
 
         match command {
-            Ping => log::info!("a"),
-            AddConnection(id) => {
-                self.connections.insert(id);
+            AddConnection(connection_id, user_id, name) => {
+                self.proxy.add_connection(&connection_id, &user_id).await?;
+                self.proxy
+                    .add_user(&PartialUser {
+                        id: user_id.clone(),
+                        name: name.clone(),
+                    })
+                    .await?;
+
+                self.send_connection(
+                    &connection_id,
+                    ServerSentCommand::ChatHistory(self.chat.get_all_messages().await?),
+                )
+                .await?;
+
+                self.chat
+                    .new_message(ChatMessage::Connection {
+                        username: name.clone(),
+                    })
+                    .await?;
+
+                self.connections.insert(connection_id, (user_id, name));
                 self.cancel_deletion();
             }
-            RemoveConnection(id) => {
-                self.connections.remove(&id);
+            RemoveConnection(connection_id, user_id, name) => {
+                self.proxy
+                    .remove_connection(&connection_id, &user_id)
+                    .await?;
+                self.proxy
+                    .remove_user(&PartialUser {
+                        id: user_id,
+                        name: name.clone(),
+                    })
+                    .await?;
+
+                self.connections.remove(&connection_id);
+                self.chat
+                    .new_message(ChatMessage::Disconnection { username: name })
+                    .await?;
+
                 if self.connections.len() == 0 {
                     self.prime_deletion();
                 }
-            }
-            Stop => {
-                return Ok(true);
             }
             ClientSent(id, data) => match data {
                 ClientSentCommand::Ping => {
                     self.send_connection(&id, "Pong").await?;
                 }
             },
+            Stop => {
+                return Ok(true);
+            }
         }
 
         Ok(false)
@@ -194,5 +251,15 @@ impl Room {
         if let Some(task) = self.deletion_timer.take() {
             task.abort();
         }
+    }
+
+    async fn broadcast<T: Serialize>(&self, data: T) -> anyhow::Result<()> {
+        self.redis
+            .publish(
+                format!("room:{}:broadcast", self.name),
+                serde_json::to_string(&ConnectionCommands::Send(serde_json::to_string(&data)?))?,
+            )
+            .await?;
+        Ok(())
     }
 }

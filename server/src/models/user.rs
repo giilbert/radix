@@ -12,7 +12,7 @@ use crate::{
     mongo::{oid_as_string, Db, ToObjectId},
 };
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
     #[serde(rename(deserialize = "_id"), serialize_with = "oid_as_string")]

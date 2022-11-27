@@ -1,17 +1,47 @@
 import { BACKEND_URL } from "@/utils/consts";
+import { Enum } from "@/utils/enum";
 import { Text } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import {
   createContext,
   PropsWithChildren,
-  useLayoutEffect,
+  useEffect,
   useRef,
   useState,
 } from "react";
+import create from "zustand";
 
-export interface RoomData {}
+type ChatMessage = Enum<{
+  Connection: {
+    username: string;
+  };
+  Disconnection: {
+    username: string;
+  };
+}>;
 
-const RoomContext = createContext<RoomData | null>(null);
+type Command = Enum<{
+  ChatMessage: ChatMessage;
+  ChatHistory: ChatMessage[];
+}>;
+
+export const useRoomData = create<{
+  chatMessages: ChatMessage[];
+  addChatMessage: (message: ChatMessage) => void;
+  setChatMessages: (messages: ChatMessage[]) => void;
+}>((set) => ({
+  chatMessages: [],
+  setChatMessages: (messages: ChatMessage[]) =>
+    set({
+      chatMessages: messages,
+    }),
+  addChatMessage: (message: ChatMessage) =>
+    set((old) => ({
+      chatMessages: [...old.chatMessages, message],
+    })),
+}));
+
+const RoomContext = createContext<WebSocket | null>(null);
 
 export const RoomProvider: React.FC<
   PropsWithChildren<Record<never, never>>
@@ -20,8 +50,10 @@ export const RoomProvider: React.FC<
   const wsRef = useRef<WebSocket>();
   const [loading, setLoading] = useState(true);
   const [closed, setClosed] = useState(false);
+  const addChatMessage = useRoomData((s) => s.addChatMessage);
+  const setChatMessages = useRoomData((s) => s.setChatMessages);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (wsRef.current || !router.query.name) return;
 
     console.log("constructing websocket", wsRef.current);
@@ -34,7 +66,14 @@ export const RoomProvider: React.FC<
     };
 
     const onMessage = (e: MessageEvent) => {
-      console.log(e.data);
+      const data: Command = JSON.parse(e.data);
+
+      console.log(data);
+      if (data.t === "ChatMessage") {
+        addChatMessage(data.c);
+      } else if (data.t === "ChatHistory") {
+        setChatMessages(data.c.reverse());
+      }
     };
 
     const onError = (e: Event) => {
@@ -59,10 +98,14 @@ export const RoomProvider: React.FC<
       wsRef.current?.close();
       wsRef.current = undefined;
     };
-  }, [router.query.name]);
+  }, [router.query.name, addChatMessage, setChatMessages]);
 
   if (closed) return <Text>Disconnected</Text>;
   if (loading) return <Text>Loading</Text>;
 
-  return <RoomContext.Provider value={null}>{children}</RoomContext.Provider>;
+  return (
+    <RoomContext.Provider value={wsRef.current!}>
+      {children}
+    </RoomContext.Provider>
+  );
 };

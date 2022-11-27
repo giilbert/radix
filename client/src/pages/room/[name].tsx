@@ -1,6 +1,7 @@
+import { Chat } from "@/components/rooms/chat";
 import { RoomProvider } from "@/components/rooms/room-provider";
 import { SidePanel } from "@/components/rooms/side-panel";
-import { Box, GridItem, SimpleGrid } from "@chakra-ui/react";
+import { GridItem, SimpleGrid } from "@chakra-ui/react";
 import { NextPage } from "next";
 import { useRouter } from "next/router";
 
@@ -16,7 +17,9 @@ const RoomPage: NextPage = () => {
 
         <GridItem bg="blackAlpha.200"></GridItem>
 
-        <GridItem bg="blackAlpha.300"></GridItem>
+        <GridItem bg="blackAlpha.300">
+          <Chat />
+        </GridItem>
       </SimpleGrid>
     </RoomProvider>
   );

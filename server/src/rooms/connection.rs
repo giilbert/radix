@@ -24,6 +24,7 @@ pub struct Connection {
     ws_tx: SplitSink<WebSocket, Message>,
     ws_rx: SplitStream<WebSocket>,
     redis_channel: ChannelReceiver,
+    broadcast_channel: ChannelReceiver,
     room: RoomProxy,
     pub id: String,
     pub user: User,
@@ -47,6 +48,10 @@ impl Connection {
             Ok(chan) => chan,
             Err(err) => return Err((ws, err)),
         };
+        let broadcast_channel = match redis.listen(format!("room:{}:broadcast", room_name)).await {
+            Ok(chan) => chan,
+            Err(err) => return Err((ws, err)),
+        };
         let (ws_tx, ws_rx) = ws.split();
 
         let room = RoomProxy::new(redis, &room_name);
@@ -55,6 +60,7 @@ impl Connection {
             ws_tx,
             ws_rx,
             redis_channel,
+            broadcast_channel,
             id,
             room,
             user,
@@ -95,11 +101,31 @@ impl Connection {
                         _ => continue
                     }
                 }
+                Some(redis_command) = self.broadcast_channel.recv() => {
+                    use fred::types::RedisValue::*;
+                    match redis_command {
+                        String(data) => {
+                            match serde_json::from_str::<ConnectionCommands>(data.to_string().as_str()) {
+                                Ok(data) => {
+                                    if self.handle_command(data).await {
+                                        break;
+                                    }
+                                },
+                                Err(err) => log::error!("Error receiving message from Redis: {:?}", err),
+                            }
+                        },
+                        _ => continue
+                    }
+                }
             }
         }
 
         self.room
-            .send_command(&RoomCommands::RemoveConnection(self.id))
+            .send_command(&RoomCommands::RemoveConnection(
+                self.id,
+                self.user.id.to_string(),
+                self.user.name,
+            ))
             .await?;
 
         Ok(())
