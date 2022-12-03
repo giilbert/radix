@@ -1,47 +1,39 @@
-use fred::prelude::{KeysInterface, PubsubInterface, SetsInterface, TransactionInterface};
+use mongodb::bson::Uuid;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, VecDeque};
 use tokio::{
-    select,
-    sync::mpsc::{self, Sender},
+    sync::mpsc::{self, Receiver, Sender},
     task::JoinHandle,
     time::{self, Duration},
 };
 
-use crate::{
-    models::user::User,
-    redis::{channels::ChannelsExt, Redis},
-    rooms::proxies::room::PartialUser,
-};
+use crate::models::user::User;
 
-use super::{
-    chat::{Chat, ChatMessage},
-    connection::ConnectionCommands,
-    proxies::room::RoomProxy,
-};
+use super::connection::ConnectionCommands;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug)]
 pub enum RoomCommands {
     Stop,
 
-    // (connection_id, user_id, name)
-    AddConnection(String, String, String),
-    RemoveConnection(String, String, String),
+    AddConnection(ConnId, Sender<ConnectionCommands>, User),
+    RemoveConnection(ConnId),
 
-    ClientSent(String, ClientSentCommand),
+    ClientSent(ConnId, ClientSentCommand),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "t", content = "c")]
 pub enum ClientSentCommand {
     Ping,
+    SendChatMessage { content: String },
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Debug)]
 #[serde(tag = "t", content = "c")]
 pub enum ServerSentCommand {
-    Pong,
-    ChatHistory(Vec<ChatMessage>),
+    // Pong,
+    Error(String),
+    ChatHistory(VecDeque<ChatMessage>),
     ChatMessage(ChatMessage),
 }
 
@@ -52,122 +44,93 @@ pub struct CreateRoom {
     pub public: bool,
 }
 
-#[derive(Serialize)]
-struct RoomData {
-    name: String,
-    public: bool,
-    owner_id: String,
-}
-
-pub struct Room {
+#[derive(Debug, Clone)]
+pub struct RoomConfig {
     pub name: String,
     pub public: bool,
     pub owner: User,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct Author {
+    name: String,
+    id: String,
+    is_owner: bool,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(tag = "t", content = "c")]
+pub enum ChatMessage {
+    UserChat { author: Author, content: String },
+    Connection { username: String },
+    Disconnection { username: String },
+    Bad,
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+pub struct ConnId(pub String);
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+pub struct UserId(pub String);
+
+const CHAT_MAX_MESSAGES: usize = 10;
+
+pub struct Room {
     pub commands: Sender<RoomCommands>,
-    chat: Chat,
-    rx: mpsc::Receiver<RoomCommands>,
-    redis: Redis,
-    proxy: RoomProxy,
-    // conn_id => (user_id, name)
-    connections: HashMap<String, (String, String)>,
+    commands_rx: Receiver<RoomCommands>,
     deletion_timer: Option<JoinHandle<()>>,
+    config: RoomConfig,
+    connections: HashMap<ConnId, (Sender<ConnectionCommands>, UserId)>,
+    users: HashMap<UserId, (ConnId, User)>,
+    chat_messages: VecDeque<ChatMessage>,
+    pub id: Uuid,
 }
 
 impl Room {
-    pub fn new(redis: &Redis, data: CreateRoom, owner: User) -> Self {
-        let (commands, rx) = mpsc::channel::<RoomCommands>(256);
-        let chat = Chat::new(redis.clone(), format!("room:{}", data.name));
+    pub fn new(id: Uuid, config: RoomConfig) -> Self {
+        let (commands, commands_rx) = mpsc::channel::<RoomCommands>(200);
 
         Room {
-            proxy: RoomProxy::new(redis.clone(), &data.name),
-            name: data.name,
-            public: data.public,
-            owner,
             commands,
-            chat,
-            rx,
-            redis: redis.clone(),
-            connections: HashMap::new(),
+            commands_rx,
+            config,
             deletion_timer: None,
+            connections: Default::default(),
+            users: Default::default(),
+            chat_messages: Default::default(),
+            id,
         }
     }
 
     pub async fn run(mut self) -> anyhow::Result<()> {
         self.prime_deletion();
-        {
-            let t = self.redis.multi(true).await?;
-            let _ = t.sadd::<i32, _, _>("rooms", &self.name).await;
-            let _ = t
-                .set::<i32, _, _>(
-                    format!("room:{}", &self.name),
-                    serde_json::to_string(&RoomData {
-                        public: self.public,
-                        name: self.name.clone(),
-                        owner_id: self.owner.id.to_string(),
-                    })?,
-                    None,
-                    None,
-                    false,
-                )
-                .await;
 
-            t.exec().await?;
-        }
+        log::info!("Room {} running", self.config.name);
 
-        let mut chan = self.redis.listen(format!("room:{}", self.name)).await?;
-        loop {
-            select! {
-                Some(command) = chan.recv() => {
-                    let command = serde_json::from_str::<RoomCommands>(
-                        command
-                            .as_str()
-                            .ok_or_else(|| anyhow::anyhow!("Command send not deserializable"))?
-                            .as_ref(),
-                    )?;
-
-                    if self.handle_command(command).await? {
-                        break;
-                    }
-                }
-
-                Some(command) = self.rx.recv() => {
-                    if self.handle_command(command).await? {
-                        break;
-                    }
-                }
+        while let Some(msg) = self.commands_rx.recv().await {
+            let stop = self.handle_command(msg).await?;
+            if stop {
+                break;
             }
         }
 
-        // cleanup
-        {
-            let t = self.redis.multi(true).await?;
-            let _ = t.srem::<i32, _, _>("rooms", &self.name).await;
-            let _ = t.del::<i32, _>(format!("room:{}", &self.name)).await;
-            let _ = t.del::<i32, _>(format!("room:{}:chat", &self.name)).await;
-            let _ = t.del::<i32, _>(format!("room:{}:users", &self.name)).await;
-            let _ = t
-                .del::<i32, _>(format!("room:{}:connections", &self.name))
-                .await;
-            t.exec().await?;
-        }
-
-        // stop all connections
-
-        log::info!("Room {} stopped", self.name);
+        log::info!("Room {} stopped", self.config.name);
 
         Ok(())
     }
 
     async fn send_connection<T: Serialize>(
         &mut self,
-        connection_id: &String,
-        data: T,
+        connection_id: &ConnId,
+        data: &T,
     ) -> anyhow::Result<()> {
-        self.redis
-            .publish(
-                connection_id,
-                serde_json::to_string(&ConnectionCommands::Send(serde_json::to_string(&data)?))?,
-            )
+        let commands = self
+            .connections
+            .get(connection_id)
+            .ok_or_else(|| anyhow::anyhow!("Connection {} not found.", connection_id.0))?;
+
+        commands
+            .0
+            .send(ConnectionCommands::Send(serde_json::to_string(data)?))
             .await?;
 
         Ok(())
@@ -177,53 +140,68 @@ impl Room {
         use RoomCommands::*;
 
         match command {
-            AddConnection(connection_id, user_id, name) => {
-                self.proxy.add_connection(&connection_id, &user_id).await?;
-                self.proxy
-                    .add_user(&PartialUser {
-                        id: user_id.clone(),
-                        name: name.clone(),
-                    })
-                    .await?;
+            AddConnection(id, commands, user) => {
+                self.cancel_deletion();
+
+                log::info!("Room {}: connection {} added", self.config.name, id.0);
+
+                let user_id = UserId(user.id.to_string());
+                self.connections
+                    .insert(id.clone(), (commands, user_id.clone()));
+
+                let username = user.name.clone();
+                self.users.insert(user_id.clone(), (id.clone(), user));
 
                 self.send_connection(
-                    &connection_id,
-                    ServerSentCommand::ChatHistory(self.chat.get_all_messages().await?),
+                    &id,
+                    &ServerSentCommand::ChatHistory(self.chat_messages.clone()),
                 )
                 .await?;
-
-                self.chat
-                    .new_message(ChatMessage::Connection {
-                        username: name.clone(),
-                    })
+                self.send_chat_message(ChatMessage::Connection { username })
                     .await?;
-
-                self.connections.insert(connection_id, (user_id, name));
-                self.cancel_deletion();
             }
-            RemoveConnection(connection_id, user_id, name) => {
-                self.proxy
-                    .remove_connection(&connection_id, &user_id)
-                    .await?;
-                self.proxy
-                    .remove_user(&PartialUser {
-                        id: user_id,
-                        name: name.clone(),
-                    })
-                    .await?;
+            RemoveConnection(id) => {
+                let (_, user_id) = self.connections.remove(&id).ok_or_else(|| {
+                    anyhow::anyhow!("Trying to remove an nonexistent connection.")
+                })?;
+                let (_, user) = self
+                    .users
+                    .remove(&user_id)
+                    .ok_or_else(|| anyhow::anyhow!("Trying to remove an nonexistent user."))?;
+                self.send_chat_message(ChatMessage::Disconnection {
+                    username: user.name,
+                })
+                .await?;
 
-                self.connections.remove(&connection_id);
-                self.chat
-                    .new_message(ChatMessage::Disconnection { username: name })
-                    .await?;
+                log::info!("Room {}: connection {} removed", self.config.name, id.0);
 
                 if self.connections.len() == 0 {
                     self.prime_deletion();
                 }
             }
             ClientSent(id, data) => match data {
-                ClientSentCommand::Ping => {
-                    self.send_connection(&id, "Pong").await?;
+                ClientSentCommand::Ping => (),
+                ClientSentCommand::SendChatMessage { content } => {
+                    let author_id = &self
+                        .connections
+                        .get(&id)
+                        .ok_or_else(|| anyhow::anyhow!("User does not exist"))?
+                        .1;
+                    let user = &self
+                        .users
+                        .get(&author_id)
+                        .ok_or_else(|| anyhow::anyhow!("User does not exist"))?
+                        .1;
+
+                    self.send_chat_message(ChatMessage::UserChat {
+                        author: Author {
+                            name: user.name.clone(),
+                            id: id.0,
+                            is_owner: user.id == self.config.owner.id,
+                        },
+                        content,
+                    })
+                    .await?;
                 }
             },
             Stop => {
@@ -232,6 +210,18 @@ impl Room {
         }
 
         Ok(false)
+    }
+
+    async fn send_all_command(&mut self, command: &ServerSentCommand) -> anyhow::Result<()> {
+        let data = serde_json::to_string(command)?;
+
+        for (commands, ..) in self.connections.values() {
+            commands
+                .send(ConnectionCommands::Send(data.clone()))
+                .await?;
+        }
+
+        Ok(())
     }
 
     fn prime_deletion(&mut self) {
@@ -253,12 +243,12 @@ impl Room {
         }
     }
 
-    async fn broadcast<T: Serialize>(&self, data: T) -> anyhow::Result<()> {
-        self.redis
-            .publish(
-                format!("room:{}:broadcast", self.name),
-                serde_json::to_string(&ConnectionCommands::Send(serde_json::to_string(&data)?))?,
-            )
+    async fn send_chat_message(&mut self, chat_message: ChatMessage) -> anyhow::Result<()> {
+        self.chat_messages.push_back(chat_message.clone());
+        if self.chat_messages.len() > CHAT_MAX_MESSAGES {
+            self.chat_messages.pop_front();
+        }
+        self.send_all_command(&ServerSentCommand::ChatMessage(chat_message))
             .await?;
         Ok(())
     }

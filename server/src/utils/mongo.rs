@@ -3,8 +3,8 @@ use std::ops::Deref;
 use crate::errors::RouteErr;
 use axum::{
     async_trait,
-    extract::{FromRequest, RequestParts},
-    http::StatusCode,
+    extract::FromRequest,
+    http::{Request, StatusCode},
 };
 use mongodb::{
     bson::{doc, oid::ObjectId},
@@ -47,13 +47,14 @@ impl Deref for Db {
 }
 
 #[async_trait]
-impl<B> FromRequest<B> for Db
+impl<S, B> FromRequest<S, B> for Db
 where
-    B: Send,
+    B: Send + 'static,
+    S: Send + Sync,
 {
     type Rejection = StatusCode;
 
-    async fn from_request(req: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
+    async fn from_request(req: Request<B>, _state: &S) -> Result<Self, Self::Rejection> {
         let db = req
             .extensions()
             .get::<Self>()

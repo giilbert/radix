@@ -4,33 +4,26 @@ use futures_util::{
     SinkExt, StreamExt,
 };
 use mongodb::bson::Uuid;
-use serde::{Deserialize, Serialize};
-use tokio::select;
-
-use crate::{
-    models::user::User,
-    redis::{
-        channels::{ChannelReceiver, ChannelsExt},
-        Redis,
-    },
+use tokio::{
+    select,
+    sync::mpsc::{self, Receiver, Sender},
 };
 
-use super::{
-    proxies::room::RoomProxy,
-    room::{ClientSentCommand, RoomCommands},
-};
+use crate::models::user::User;
+
+use super::room::{ClientSentCommand, ConnId, RoomCommands};
 
 pub struct Connection {
+    pub commands: Sender<ConnectionCommands>,
+    pub id: ConnId,
+    pub user: User,
+    commands_rx: Receiver<ConnectionCommands>,
+    room_commands: Sender<RoomCommands>,
     ws_tx: SplitSink<WebSocket, Message>,
     ws_rx: SplitStream<WebSocket>,
-    redis_channel: ChannelReceiver,
-    broadcast_channel: ChannelReceiver,
-    room: RoomProxy,
-    pub id: String,
-    pub user: User,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug)]
 pub enum ConnectionCommands {
     Send(String),
     Stop,
@@ -40,30 +33,35 @@ impl Connection {
     pub async fn new(
         ws: WebSocket,
         user: User,
-        room_name: String,
-        redis: Redis,
-    ) -> Result<Self, (WebSocket, anyhow::Error)> {
-        let id = format!("connection:{}", Uuid::new().to_string());
-        let redis_channel = match redis.listen(id.clone()).await {
-            Ok(chan) => chan,
-            Err(err) => return Err((ws, err)),
-        };
-        let broadcast_channel = match redis.listen(format!("room:{}:broadcast", room_name)).await {
-            Ok(chan) => chan,
-            Err(err) => return Err((ws, err)),
-        };
+        room_commands: Sender<RoomCommands>,
+    ) -> Result<Self, SplitSink<WebSocket, Message>> {
         let (ws_tx, ws_rx) = ws.split();
+        let (commands, commands_rx) = mpsc::channel::<ConnectionCommands>(100);
+        let id = ConnId(Uuid::new().to_string());
 
-        let room = RoomProxy::new(redis, &room_name);
+        match room_commands
+            .send(RoomCommands::AddConnection(
+                id.clone(),
+                commands.clone(),
+                user.clone(),
+            ))
+            .await
+        {
+            Err(err) => {
+                log::error!("Erroring adding connection: {}", err);
+                return Err(ws_tx);
+            }
+            _ => (),
+        }
 
         Ok(Self {
             ws_tx,
             ws_rx,
-            redis_channel,
-            broadcast_channel,
             id,
-            room,
             user,
+            room_commands,
+            commands,
+            commands_rx,
         })
     }
 
@@ -80,52 +78,20 @@ impl Connection {
                         None => break
                     };
 
-
                     if let Err(err) = self.handle_message(data).await {
                         log::error!("Error handling message {}", err);
                     }
                 }
-                Some(redis_command) = self.redis_channel.recv() => {
-                    use fred::types::RedisValue::*;
-                    match redis_command {
-                        String(data) => {
-                            match serde_json::from_str::<ConnectionCommands>(data.to_string().as_str()) {
-                                Ok(data) => {
-                                    if self.handle_command(data).await {
-                                        break;
-                                    }
-                                },
-                                Err(err) => log::error!("Error receiving message from Redis: {:?}", err),
-                            }
-                        },
-                        _ => continue
-                    }
-                }
-                Some(redis_command) = self.broadcast_channel.recv() => {
-                    use fred::types::RedisValue::*;
-                    match redis_command {
-                        String(data) => {
-                            match serde_json::from_str::<ConnectionCommands>(data.to_string().as_str()) {
-                                Ok(data) => {
-                                    if self.handle_command(data).await {
-                                        break;
-                                    }
-                                },
-                                Err(err) => log::error!("Error receiving message from Redis: {:?}", err),
-                            }
-                        },
-                        _ => continue
+
+                Some(command) = self.commands_rx.recv() => {
+                    if self.handle_command(command).await {
+                        break;
                     }
                 }
             }
         }
-
-        self.room
-            .send_command(&RoomCommands::RemoveConnection(
-                self.id,
-                self.user.id.to_string(),
-                self.user.name,
-            ))
+        self.room_commands
+            .send(RoomCommands::RemoveConnection(self.id))
             .await?;
 
         Ok(())
@@ -150,13 +116,12 @@ impl Connection {
         match message {
             Message::Text(string) => {
                 let data = serde_json::from_str::<ClientSentCommand>(&string)?;
-                self.room
-                    .send_command(&RoomCommands::ClientSent(self.id.clone(), data))
+                self.room_commands
+                    .send(RoomCommands::ClientSent(self.id.clone(), data))
                     .await?;
             }
             _ => (),
         }
-
         Ok(())
     }
 }

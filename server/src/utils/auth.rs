@@ -4,8 +4,8 @@ use crate::{
 };
 use axum::{
     async_trait,
-    extract::{FromRequest, RequestParts},
-    http::StatusCode,
+    extract::FromRequestParts,
+    http::{request::Parts, StatusCode},
 };
 use regex::Regex;
 
@@ -35,15 +35,14 @@ lazy_static::lazy_static! {
 }
 
 #[async_trait]
-impl<B> FromRequest<B> for User
+impl<S> FromRequestParts<S> for User
 where
-    B: Send,
+    S: Send + Sync,
 {
     type Rejection = StatusCode;
-
-    async fn from_request(req: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
-        let cookie = req
-            .headers()
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let cookie = parts
+            .headers
             .get("cookie")
             .ok_or(StatusCode::UNAUTHORIZED)?
             .to_str()
@@ -55,7 +54,7 @@ where
             .ok_or(StatusCode::UNAUTHORIZED)?;
         let session_token = captures.get(1).ok_or(StatusCode::UNAUTHORIZED)?.as_str();
 
-        let user_repo = UserRepo::from_request(req).await?;
+        let user_repo = UserRepo::from_request_parts(parts, state).await?;
         let session_and_user = user_repo
             .get_session_and_user(session_token)
             .await

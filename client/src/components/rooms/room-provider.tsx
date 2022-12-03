@@ -5,6 +5,8 @@ import { useRouter } from "next/router";
 import {
   createContext,
   PropsWithChildren,
+  useCallback,
+  useContext,
   useEffect,
   useRef,
   useState,
@@ -18,11 +20,25 @@ type ChatMessage = Enum<{
   Disconnection: {
     username: string;
   };
+  UserChat: {
+    author: {
+      name: string;
+      id: string;
+      isOwner: boolean;
+    };
+    content: string;
+  };
 }>;
 
-type Command = Enum<{
+type ServerSentCommand = Enum<{
   ChatMessage: ChatMessage;
   ChatHistory: ChatMessage[];
+}>;
+
+type ClientSentCommand = Enum<{
+  SendChatMessage: {
+    content: string;
+  };
 }>;
 
 export const useRoomData = create<{
@@ -40,6 +56,19 @@ export const useRoomData = create<{
       chatMessages: [...old.chatMessages, message],
     })),
 }));
+
+export const useRoom = () => {
+  const ws = useContext(RoomContext);
+  if (!ws) throw "Using RoomContext before initialization.";
+  const sendCommand = useCallback(
+    (command: ClientSentCommand) => {
+      ws.send(JSON.stringify(command));
+    },
+    [ws]
+  );
+
+  return { sendCommand };
+};
 
 const RoomContext = createContext<WebSocket | null>(null);
 
@@ -66,13 +95,13 @@ export const RoomProvider: React.FC<
     };
 
     const onMessage = (e: MessageEvent) => {
-      const data: Command = JSON.parse(e.data);
+      const data: ServerSentCommand = JSON.parse(e.data);
 
       console.log(data);
       if (data.t === "ChatMessage") {
         addChatMessage(data.c);
       } else if (data.t === "ChatHistory") {
-        setChatMessages(data.c.reverse());
+        setChatMessages(data.c);
       }
     };
 

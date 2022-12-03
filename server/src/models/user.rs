@@ -1,7 +1,7 @@
 use axum::{
     async_trait,
-    extract::{FromRequest, RequestParts},
-    http::StatusCode,
+    extract::FromRequestParts,
+    http::{request::Parts, StatusCode},
 };
 use chrono::{DateTime, Utc};
 use mongodb::bson::{self, doc, oid::ObjectId};
@@ -225,8 +225,7 @@ impl UserRepo {
         session_token: impl AsRef<str>,
         expires: &String,
     ) -> Result<(), RouteErr> {
-        let data = self
-            .0
+        self.0
             .collection::<User>("users")
             .update_one(
                 doc! {
@@ -247,10 +246,13 @@ impl UserRepo {
 }
 
 #[async_trait]
-impl<B: Send> FromRequest<B> for UserRepo {
+impl<S> FromRequestParts<S> for UserRepo
+where
+    S: Send + Sync,
+{
     type Rejection = StatusCode;
-    async fn from_request(req: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
-        let db = req.extensions().get::<Db>().expect("db not in extensions");
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        let db = parts.extensions.get::<Db>().unwrap();
         Ok(Self(db.clone()))
     }
 }

@@ -1,9 +1,18 @@
-import { useRoomData } from "./room-provider";
+import { useRoom, useRoomData } from "./room-provider";
 import { CgEnter } from "react-icons/cg";
 import { IoMdExit } from "react-icons/io";
-import { Box, Flex, Heading, HStack, Textarea, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Flex,
+  Heading,
+  HStack,
+  Text,
+  Textarea,
+  VStack,
+} from "@chakra-ui/react";
 
 export const Chat: React.FC = () => {
+  const room = useRoom();
   const messages = useRoomData((s) => s.chatMessages);
 
   return (
@@ -47,6 +56,25 @@ export const Chat: React.FC = () => {
                 {v.c.username} disconnected
               </>
             )}
+
+            {v.t === "UserChat" && (
+              <Box>
+                <Text
+                  color="gray.100"
+                  _hover={{
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                  }}
+                >
+                  {v.c.author.name}
+                </Text>
+                {v.c.content.split("\n").map((line, i) => (
+                  <Text color="gray.400" key={i}>
+                    {line || " "}
+                  </Text>
+                ))}
+              </Box>
+            )}
           </HStack>
         ))}
       </Flex>
@@ -58,6 +86,12 @@ export const Chat: React.FC = () => {
           bg="gray.800"
           onKeyPress={(e) => {
             if (!e.shiftKey && e.key === "Enter") {
+              room.sendCommand({
+                t: "SendChatMessage",
+                c: {
+                  content: e.currentTarget.value,
+                },
+              });
               console.log(e.currentTarget.value);
               e.preventDefault();
               e.currentTarget.value = "";
