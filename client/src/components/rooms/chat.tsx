@@ -6,33 +6,40 @@ import {
   Flex,
   Heading,
   HStack,
+  Image,
   Text,
   Textarea,
+  Tooltip,
   VStack,
 } from "@chakra-ui/react";
 
 export const Chat: React.FC = () => {
   const room = useRoom();
   const messages = useRoomData((s) => s.chatMessages);
+  const users = useRoomData((s) => s.users);
 
   return (
     <VStack h="100vh" border="1px" borderColor="gray.700">
-      <Flex
-        h="3rem"
-        alignItems="center"
-        borderBottom="1px"
-        borderColor="gray.700"
-        w="100%"
-      >
-        <Heading fontSize="2xl" ml="4">
-          Chat
-        </Heading>
-      </Flex>
+      <Box h="4rem" borderBottom="1px" borderColor="gray.700" w="100%" mt="4">
+        <HStack mt="2" ml="4">
+          {users.map((user) => (
+            <Tooltip key={user.id} label={user.name}>
+              <Image
+                src={user.image}
+                w="32px"
+                borderRadius={999}
+                alt=""
+                cursor="pointer"
+              />
+            </Tooltip>
+          ))}
+        </HStack>
+      </Box>
       <Flex
         overflowY="scroll"
         flexDirection="column"
         w="100%"
-        h="calc(100vh - 8rem - 3rem)"
+        h="calc(100vh - 8rem - 4rem)"
       >
         {messages.map((v, i) => (
           <HStack
@@ -58,22 +65,31 @@ export const Chat: React.FC = () => {
             )}
 
             {v.t === "UserChat" && (
-              <Box>
-                <Text
-                  color="gray.100"
-                  _hover={{
-                    cursor: "pointer",
-                    textDecoration: "underline",
-                  }}
-                >
-                  {v.c.author.name}
-                </Text>
-                {v.c.content.split("\n").map((line, i) => (
-                  <Text color="gray.400" key={i}>
-                    {line || " "}
+              <HStack gap="1">
+                <Image
+                  src={v.c.author.image}
+                  w="24px"
+                  borderRadius={999}
+                  alt=""
+                  cursor="pointer"
+                />
+                <Box pt="3">
+                  <Text
+                    color="gray.100"
+                    _hover={{
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                    }}
+                  >
+                    {v.c.author.name}
                   </Text>
-                ))}
-              </Box>
+                  {v.c.content.split("\n").map((line, i) => (
+                    <Text color="gray.400" key={i}>
+                      {line || " "}
+                    </Text>
+                  ))}
+                </Box>
+              </HStack>
             )}
           </HStack>
         ))}

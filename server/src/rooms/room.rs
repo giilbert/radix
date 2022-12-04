@@ -28,6 +28,13 @@ pub enum ClientSentCommand {
     SendChatMessage { content: String },
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PublicUser {
+    id: String,
+    name: String,
+    image: String,
+}
+
 #[derive(Serialize, Debug)]
 #[serde(tag = "t", content = "c")]
 pub enum ServerSentCommand {
@@ -35,6 +42,7 @@ pub enum ServerSentCommand {
     Error(String),
     ChatHistory(VecDeque<ChatMessage>),
     ChatMessage(ChatMessage),
+    SetUsers(Vec<PublicUser>),
 }
 
 #[derive(Deserialize, Debug)]
@@ -61,7 +69,7 @@ pub struct Author {
 #[derive(Serialize, Debug, Clone)]
 #[serde(tag = "t", content = "c")]
 pub enum ChatMessage {
-    UserChat { author: Author, content: String },
+    UserChat { author: PublicUser, content: String },
     Connection { username: String },
     Disconnection { username: String },
     Bad,
@@ -159,6 +167,17 @@ impl Room {
                 .await?;
                 self.send_chat_message(ChatMessage::Connection { username })
                     .await?;
+                self.send_all_command(&ServerSentCommand::SetUsers(
+                    self.users
+                        .iter()
+                        .map(|(_, (_, user))| PublicUser {
+                            id: user.id.to_string(),
+                            name: user.name.to_string(),
+                            image: user.image.clone(),
+                        })
+                        .collect(),
+                ))
+                .await?;
             }
             RemoveConnection(id) => {
                 let (_, user_id) = self.connections.remove(&id).ok_or_else(|| {
@@ -171,6 +190,18 @@ impl Room {
                 self.send_chat_message(ChatMessage::Disconnection {
                     username: user.name,
                 })
+                .await?;
+
+                self.send_all_command(&ServerSentCommand::SetUsers(
+                    self.users
+                        .iter()
+                        .map(|(_, (_, user))| PublicUser {
+                            id: user.id.to_string(),
+                            name: user.name.to_string(),
+                            image: user.image.clone(),
+                        })
+                        .collect(),
+                ))
                 .await?;
 
                 log::info!("Room {}: connection {} removed", self.config.name, id.0);
@@ -194,10 +225,10 @@ impl Room {
                         .1;
 
                     self.send_chat_message(ChatMessage::UserChat {
-                        author: Author {
+                        author: PublicUser {
                             name: user.name.clone(),
                             id: id.0,
-                            is_owner: user.id == self.config.owner.id,
+                            image: user.image.clone(),
                         },
                         content,
                     })

@@ -21,18 +21,21 @@ type ChatMessage = Enum<{
     username: string;
   };
   UserChat: {
-    author: {
-      name: string;
-      id: string;
-      isOwner: boolean;
-    };
+    author: RoomUser;
     content: string;
   };
 }>;
 
+type RoomUser = {
+  id: string;
+  name: string;
+  image: string;
+};
+
 type ServerSentCommand = Enum<{
   ChatMessage: ChatMessage;
   ChatHistory: ChatMessage[];
+  SetUsers: RoomUser[];
 }>;
 
 type ClientSentCommand = Enum<{
@@ -43,10 +46,13 @@ type ClientSentCommand = Enum<{
 
 export const useRoomData = create<{
   chatMessages: ChatMessage[];
+  users: RoomUser[];
   addChatMessage: (message: ChatMessage) => void;
   setChatMessages: (messages: ChatMessage[]) => void;
+  setUsers: (users: RoomUser[]) => void;
 }>((set) => ({
   chatMessages: [],
+  users: [],
   setChatMessages: (messages: ChatMessage[]) =>
     set({
       chatMessages: messages,
@@ -55,6 +61,10 @@ export const useRoomData = create<{
     set((old) => ({
       chatMessages: [...old.chatMessages, message],
     })),
+  setUsers: (users: RoomUser[]) =>
+    set({
+      users,
+    }),
 }));
 
 export const useRoom = () => {
@@ -81,6 +91,7 @@ export const RoomProvider: React.FC<
   const [closed, setClosed] = useState(false);
   const addChatMessage = useRoomData((s) => s.addChatMessage);
   const setChatMessages = useRoomData((s) => s.setChatMessages);
+  const setUsers = useRoomData((s) => s.setUsers);
 
   useEffect(() => {
     if (wsRef.current || !router.query.name) return;
@@ -102,6 +113,8 @@ export const RoomProvider: React.FC<
         addChatMessage(data.c);
       } else if (data.t === "ChatHistory") {
         setChatMessages(data.c);
+      } else if (data.t === "SetUsers") {
+        setUsers(data.c);
       }
     };
 
