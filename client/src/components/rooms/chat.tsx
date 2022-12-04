@@ -12,13 +12,14 @@ import {
   Tooltip,
   VStack,
 } from "@chakra-ui/react";
-import { createRef, useEffect } from "react";
+import { createRef, useEffect, useRef } from "react";
 
 export const Chat: React.FC = () => {
   const room = useRoom();
   const messages = useRoomData((s) => s.chatMessages);
   const users = useRoomData((s) => s.users);
   const containerRef = createRef<HTMLDivElement>();
+  const hasInit = useRef(false);
 
   useEffect(() => {
     if (containerRef.current) {
@@ -28,11 +29,22 @@ export const Chat: React.FC = () => {
       const maxScrollBefore =
         maxScroll - ((el.lastChild as HTMLElement | null)?.clientHeight || 0);
 
-      if (Math.abs(maxScrollBefore - el.scrollTop) < 10) {
+      if (Math.abs(maxScrollBefore - el.scrollTop) < 30) {
         el.scrollTop = maxScroll;
       }
     }
   }, [messages.length]);
+
+  useEffect(() => {
+    if (containerRef.current && messages.length !== 0 && !hasInit.current) {
+      const maxScroll =
+        containerRef.current.scrollHeight - containerRef.current.clientHeight;
+      containerRef.current.scrollTop = maxScroll;
+
+      console.log("scrolling");
+      hasInit.current = true;
+    }
+  }, [containerRef.current, messages.length]);
 
   return (
     <VStack h="100vh" border="1px" borderColor="gray.700">
@@ -103,7 +115,7 @@ export const Chat: React.FC = () => {
                     {v.c.author.name}
                   </Text>
                   {v.c.content.split("\n").map((line, i) => (
-                    <Text color="gray.400" key={i} wordBreak="break-all">
+                    <Text color="gray.300" key={i} wordBreak="break-all">
                       {line || " "}
                     </Text>
                   ))}
@@ -120,6 +132,11 @@ export const Chat: React.FC = () => {
           borderRadius="0"
           bg="gray.800"
           onKeyPress={(e) => {
+            if (e.key === "Enter" && e.currentTarget.value === "") {
+              e.preventDefault();
+              return;
+            }
+
             if (!e.shiftKey && e.key === "Enter") {
               room.sendCommand({
                 t: "SendChatMessage",
