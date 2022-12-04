@@ -10,9 +10,10 @@ use crate::{
     errors::RouteErr,
     models::user::{Account, CreateUser, Session, SessionAndUser, User, UserRepo},
     utils::auth::verify_user,
+    AppState,
 };
 
-pub fn auth_routes() -> Router {
+pub fn auth_routes() -> Router<AppState> {
     Router::new()
         .route("/user", post(create_user))
         .route("/user/:id", get(get_user_by_id))

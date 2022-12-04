@@ -47,11 +47,12 @@ async fn main() -> anyhow::Result<()> {
         .allow_credentials(true)
         .allow_origin(["http://localhost:3000".parse()?]);
 
-    let app = Router::new()
+    let app = Router::<AppState>::new()
         .nest("/auth", auth_routes())
-        .nest("/room", room_routes().with_state(app_state.clone()))
+        .nest("/room", room_routes())
         .layer(Extension(db))
-        .layer(cors_layer);
+        .layer(cors_layer)
+        .with_state(app_state);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3001));
     log::info!("Listening on {}", addr);
