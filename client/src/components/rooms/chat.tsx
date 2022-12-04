@@ -12,11 +12,27 @@ import {
   Tooltip,
   VStack,
 } from "@chakra-ui/react";
+import { createRef, useEffect } from "react";
 
 export const Chat: React.FC = () => {
   const room = useRoom();
   const messages = useRoomData((s) => s.chatMessages);
   const users = useRoomData((s) => s.users);
+  const containerRef = createRef<HTMLDivElement>();
+
+  useEffect(() => {
+    if (containerRef.current) {
+      const el = containerRef.current;
+      const maxScroll = el.scrollHeight - el.clientHeight;
+
+      const maxScrollBefore =
+        maxScroll - ((el.lastChild as HTMLElement | null)?.clientHeight || 0);
+
+      if (Math.abs(maxScrollBefore - el.scrollTop) < 10) {
+        el.scrollTop = maxScroll;
+      }
+    }
+  }, [messages.length]);
 
   return (
     <VStack h="100vh" border="1px" borderColor="gray.700">
@@ -28,7 +44,8 @@ export const Chat: React.FC = () => {
                 src={user.image}
                 w="32px"
                 borderRadius={999}
-                alt=""
+                alt={""}
+                bg="white"
                 cursor="pointer"
               />
             </Tooltip>
@@ -40,6 +57,7 @@ export const Chat: React.FC = () => {
         flexDirection="column"
         w="100%"
         h="calc(100vh - 8rem - 4rem)"
+        ref={containerRef}
       >
         {messages.map((v, i) => (
           <HStack
@@ -80,11 +98,12 @@ export const Chat: React.FC = () => {
                       cursor: "pointer",
                       textDecoration: "underline",
                     }}
+                    wordBreak="break-all"
                   >
                     {v.c.author.name}
                   </Text>
                   {v.c.content.split("\n").map((line, i) => (
-                    <Text color="gray.400" key={i}>
+                    <Text color="gray.400" key={i} wordBreak="break-all">
                       {line || " "}
                     </Text>
                   ))}
