@@ -24,6 +24,8 @@ type ChatMessage = Enum<{
     author: RoomUser;
     content: string;
   };
+  RoundBegin: null;
+  RoundEnd: null;
 }>;
 
 type RoomUser = {
@@ -32,27 +34,67 @@ type RoomUser = {
   image: string;
 };
 
+type RoomConfig = {
+  name: string;
+  public: boolean;
+  owner: RoomUser;
+};
+
+type BoilerplateCode = {
+  python: string;
+  javascript: string;
+};
+
+type Problem = {
+  id: string;
+  title: string;
+  description: string;
+  boilerplateCode: BoilerplateCode;
+  defaultTestCase: {
+    input: string;
+    output: string;
+  };
+};
+
 type ServerSentCommand = Enum<{
   ChatMessage: ChatMessage;
   ChatHistory: ChatMessage[];
   SetUsers: RoomUser[];
+  SetRoomConfig: RoomConfig;
+  SetProblems: Problem[] | null;
 }>;
 
 type ClientSentCommand = Enum<{
   SendChatMessage: {
     content: string;
   };
+  BeginRound: null;
+  SetEditorContent: { content: string; questionId: string };
+  TestCode: { customTestCase: { input: string; output: string } | null };
+  SubmitCode: null;
 }>;
 
 export const useRoomData = create<{
   chatMessages: ChatMessage[];
   users: RoomUser[];
+  roomConfig: RoomConfig | null;
+  problems: Problem[] | null;
+  code: Map<number, Map<string, string>>;
+  currentProblemIndex: number;
+  setCurrentProblemIndex: (index: number) => void;
   addChatMessage: (message: ChatMessage) => void;
   setChatMessages: (messages: ChatMessage[]) => void;
   setUsers: (users: RoomUser[]) => void;
+  setRoomConfig: (roomConfig: RoomConfig) => void;
+  setProblems: (problems: Problem[] | null) => void;
+  setProblemCode: (problemId: number, language: string, code: string) => void;
 }>((set) => ({
   chatMessages: [],
   users: [],
+  roomConfig: null,
+  problems: null,
+  code: new Map(),
+  currentProblemIndex: 0,
   setChatMessages: (messages: ChatMessage[]) =>
     set({
       chatMessages: messages,
@@ -65,6 +107,34 @@ export const useRoomData = create<{
     set({
       users,
     }),
+  setRoomConfig: (roomConfig: RoomConfig) => set({ roomConfig }),
+  setProblems: (problems: Problem[] | null) => {
+    const code: Map<number, Map<string, string>> = new Map();
+    problems?.forEach((problem, i) => {
+      let map = new Map();
+      map.set("python", problem.boilerplateCode.python);
+      map.set("javascript", problem.boilerplateCode.javascript);
+      code.set(i, map);
+    });
+
+    set({ problems, code });
+  },
+  setProblemCode: (problemId: number, language: string, code: string) =>
+    set((before) => {
+      let problem = before.code.get(problemId);
+      if (!problem)
+        return {
+          code: before.code,
+        };
+
+      problem.set(language, code);
+
+      return {
+        code: before.code,
+      };
+    }),
+  setCurrentProblemIndex: (index: number) =>
+    set({ currentProblemIndex: index }),
 }));
 
 export const useRoom = () => {
@@ -92,6 +162,8 @@ export const RoomProvider: React.FC<
   const addChatMessage = useRoomData((s) => s.addChatMessage);
   const setChatMessages = useRoomData((s) => s.setChatMessages);
   const setUsers = useRoomData((s) => s.setUsers);
+  const setRoomConfig = useRoomData((s) => s.setRoomConfig);
+  const setProblems = useRoomData((s) => s.setProblems);
 
   useEffect(() => {
     if (wsRef.current || !router.query.name) return;
@@ -115,6 +187,10 @@ export const RoomProvider: React.FC<
         setChatMessages(data.c);
       } else if (data.t === "SetUsers") {
         setUsers(data.c);
+      } else if (data.t === "SetRoomConfig") {
+        setRoomConfig(data.c);
+      } else if (data.t === "SetProblems") {
+        setProblems(data.c);
       }
     };
 
@@ -140,7 +216,14 @@ export const RoomProvider: React.FC<
       wsRef.current?.close();
       wsRef.current = undefined;
     };
-  }, [router.query.name, addChatMessage, setChatMessages]);
+  }, [
+    router.query.name,
+    addChatMessage,
+    setChatMessages,
+    setUsers,
+    setRoomConfig,
+    setProblems,
+  ]);
 
   if (closed) return <Text>Disconnected</Text>;
   if (loading) return <Text>Loading</Text>;

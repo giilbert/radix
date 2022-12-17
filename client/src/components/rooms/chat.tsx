@@ -13,6 +13,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { createRef, useEffect, useRef } from "react";
+import { FiFlag } from "react-icons/fi";
 
 export const Chat: React.FC = () => {
   const room = useRoom();
@@ -44,7 +45,7 @@ export const Chat: React.FC = () => {
       console.log("scrolling");
       hasInit.current = true;
     }
-  }, [containerRef.current, messages.length]);
+  }, [containerRef, messages.length]);
 
   return (
     <VStack h="100vh" border="1px" borderColor="gray.700">
@@ -80,6 +81,12 @@ export const Chat: React.FC = () => {
             gap="2"
             _hover={{ bgColor: "gray.800" }}
           >
+            {v.t === "RoundBegin" && (
+              <>
+                <FiFlag size={20} color="#48BB78" />
+                Round began!
+              </>
+            )}
             {v.t === "Connection" && (
               <>
                 <CgEnter size={20} color="#777" />

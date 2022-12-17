@@ -1,4 +1,4 @@
-use mongodb::bson::Uuid;
+use mongodb::bson::{oid::ObjectId, Uuid};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use tokio::{
@@ -7,7 +7,10 @@ use tokio::{
     time::{self, Duration},
 };
 
-use crate::models::user::User;
+use crate::models::{
+    problem::{Code, Problem, ProblemPublic, TestCase},
+    user::User,
+};
 
 use super::connection::ConnectionCommands;
 
@@ -25,7 +28,20 @@ pub enum RoomCommands {
 #[serde(tag = "t", content = "c")]
 pub enum ClientSentCommand {
     Ping,
-    SendChatMessage { content: String },
+    SendChatMessage {
+        content: String,
+    },
+    BeginRound,
+    SetEditorContent {
+        #[serde(rename = "questionId")]
+        question_id: String,
+        content: String,
+    },
+    TestCode {
+        #[serde(rename = "customTestCase")]
+        custom_test_case: Option<TestCase>,
+    },
+    SubmitCode,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -43,6 +59,12 @@ pub enum ServerSentCommand {
     ChatHistory(VecDeque<ChatMessage>),
     ChatMessage(ChatMessage),
     SetUsers(Vec<PublicUser>),
+    SetRoomConfig {
+        name: String,
+        public: bool,
+        owner: PublicUser,
+    },
+    SetProblems(Option<Vec<ProblemPublic>>),
 }
 
 #[derive(Deserialize, Debug)]
@@ -72,6 +94,8 @@ pub enum ChatMessage {
     UserChat { author: PublicUser, content: String },
     Connection { username: String },
     Disconnection { username: String },
+    RoundBegin,
+    RoundEnd,
     Bad,
 }
 
@@ -80,7 +104,7 @@ pub struct ConnId(pub String);
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct UserId(pub String);
 
-const CHAT_MAX_MESSAGES: usize = 10;
+const CHAT_MAX_MESSAGES: usize = 250;
 
 pub struct Room {
     pub commands: Sender<RoomCommands>,
@@ -89,7 +113,11 @@ pub struct Room {
     config: RoomConfig,
     connections: HashMap<ConnId, (Sender<ConnectionCommands>, UserId)>,
     users: HashMap<UserId, (ConnId, User)>,
+    // user id -> (question id -> code)
+    editor_contents: HashMap<UserId, HashMap<String, String>>,
     chat_messages: VecDeque<ChatMessage>,
+    problems: Vec<Problem>,
+    round_in_progress: bool,
     pub id: Uuid,
 }
 
@@ -105,6 +133,48 @@ impl Room {
             connections: Default::default(),
             users: Default::default(),
             chat_messages: Default::default(),
+            editor_contents: Default::default(),
+            problems: vec![
+                Problem {
+                    id: ObjectId::new(),
+                    title: "Two Sum".into(),
+                    description: "You know what this means".into(),
+                    boilerplate_code: Code {
+                        javascript: "function twoSum(nums, target) {\n  \n}\n".into(),
+                        python: "def two_sum(nums, target):\n  pass\n".into(),
+                    },
+                    test_cases: vec![
+                        TestCase {
+                            input: r#"[[2, 7, 11, 15], 6]"#.into(),
+                            output: "[0, 1]".into(),
+                        },
+                        TestCase {
+                            input: r#"[[3, 2, 4], 6]"#.into(),
+                            output: "[1, 2]".into(),
+                        },
+                    ],
+                },
+                Problem {
+                    id: ObjectId::new(),
+                    title: "Roman to Integer".into(),
+                    description: "Convert roman numerals to integers".into(),
+                    boilerplate_code: Code {
+                        javascript: "function romanToInteger(romanNumeral) {\n  \n}\n".into(),
+                        python: "def roman_to_integer(roman_numeral):\n  pass\n".into(),
+                    },
+                    test_cases: vec![
+                        TestCase {
+                            input: r#""MCMXCIV""#.into(),
+                            output: "1994".into(),
+                        },
+                        TestCase {
+                            input: r#"LVIII"#.into(),
+                            output: "58".into(),
+                        },
+                    ],
+                },
+            ],
+            round_in_progress: false,
             id,
         }
     }
@@ -165,6 +235,19 @@ impl Room {
                     &ServerSentCommand::ChatHistory(self.chat_messages.clone()),
                 )
                 .await?;
+                self.send_connection(
+                    &id,
+                    &ServerSentCommand::SetRoomConfig {
+                        name: self.config.name.clone(),
+                        public: self.config.public,
+                        owner: PublicUser {
+                            id: self.config.owner.id.to_string(),
+                            name: self.config.owner.name.clone(),
+                            image: self.config.owner.image.clone(),
+                        },
+                    },
+                )
+                .await?;
                 self.send_chat_message(ChatMessage::Connection { username })
                     .await?;
                 self.send_all_command(&ServerSentCommand::SetUsers(
@@ -178,6 +261,25 @@ impl Room {
                         .collect(),
                 ))
                 .await?;
+
+                self.editor_contents
+                    .insert(user_id.clone(), HashMap::default());
+
+                if self.round_in_progress {
+                    self.send_all_command(&ServerSentCommand::SetProblems(Some(
+                        self.problems
+                            .iter()
+                            .map(|prob| ProblemPublic {
+                                id: prob.id.to_string(),
+                                description: prob.description.clone(),
+                                title: prob.title.clone(),
+                                boilerplate_code: prob.boilerplate_code.clone(),
+                                default_test_case: prob.test_cases[0].clone(),
+                            })
+                            .collect(),
+                    )))
+                    .await?;
+                }
             }
             RemoveConnection(id) => {
                 let (_, user_id) = self.connections.remove(&id).ok_or_else(|| {
@@ -191,6 +293,9 @@ impl Room {
                     username: user.name,
                 })
                 .await?;
+                self.editor_contents.remove(&user_id).ok_or_else(|| {
+                    anyhow::anyhow!("Trying to remove a editor content from an nonexistent user.")
+                })?;
 
                 self.send_all_command(&ServerSentCommand::SetUsers(
                     self.users
@@ -210,31 +315,63 @@ impl Room {
                     self.prime_deletion();
                 }
             }
-            ClientSent(id, data) => match data {
-                ClientSentCommand::Ping => (),
-                ClientSentCommand::SendChatMessage { content } => {
-                    let author_id = &self
-                        .connections
-                        .get(&id)
-                        .ok_or_else(|| anyhow::anyhow!("User does not exist"))?
-                        .1;
-                    let user = &self
-                        .users
-                        .get(&author_id)
-                        .ok_or_else(|| anyhow::anyhow!("User does not exist"))?
-                        .1;
+            ClientSent(conn_id, data) => {
+                let (user_cmd, user_id) = match self.connections.get(&conn_id) {
+                    Some(u) => u,
+                    None => return Ok(false),
+                };
+                let (_, user) = match self.users.get(&user_id) {
+                    Some(u) => u,
+                    None => return Ok(false),
+                };
 
-                    self.send_chat_message(ChatMessage::UserChat {
-                        author: PublicUser {
-                            name: user.name.clone(),
-                            id: id.0,
-                            image: user.image.clone(),
-                        },
+                match data {
+                    ClientSentCommand::Ping => (),
+                    ClientSentCommand::SendChatMessage { content } => {
+                        self.send_chat_message(ChatMessage::UserChat {
+                            author: PublicUser {
+                                name: user.name.clone(),
+                                id: conn_id.0,
+                                image: user.image.clone(),
+                            },
+                            content,
+                        })
+                        .await?;
+                    }
+                    ClientSentCommand::BeginRound => {
+                        if self.round_in_progress {
+                            return Ok(false);
+                        }
+                        self.send_chat_message(ChatMessage::RoundBegin).await?;
+                        self.send_all_command(&ServerSentCommand::SetProblems(Some(
+                            self.problems
+                                .iter()
+                                .map(|prob| ProblemPublic {
+                                    id: prob.id.to_string(),
+                                    description: prob.description.clone(),
+                                    title: prob.title.clone(),
+                                    boilerplate_code: prob.boilerplate_code.clone(),
+                                    default_test_case: prob.test_cases[0].clone(),
+                                })
+                                .collect(),
+                        )))
+                        .await?;
+                        self.round_in_progress = true;
+                    }
+                    ClientSentCommand::SetEditorContent {
+                        question_id,
                         content,
-                    })
-                    .await?;
+                    } => {
+                        log::info!("{:?} set {}", user_id, content);
+                    }
+                    ClientSentCommand::TestCode { custom_test_case } => {
+                        log::info!("{:?} test {:?}", user_id, custom_test_case);
+                    }
+                    ClientSentCommand::SubmitCode => {
+                        log::info!("{:?} submitted", user_id);
+                    }
                 }
-            },
+            }
             Stop => {
                 return Ok(true);
             }
