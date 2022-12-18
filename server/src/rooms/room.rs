@@ -7,12 +7,15 @@ use tokio::{
     time::{self, Duration},
 };
 
-use crate::models::{
-    problem::{Code, Problem, ProblemPublic, TestCase},
-    user::User,
+use crate::{
+    models::{
+        problem::{Code, Problem, ProblemPublic, TestCase},
+        user::User,
+    },
+    rooms::judge,
 };
 
-use super::connection::ConnectionCommands;
+use super::{connection::ConnectionCommands, judge::FailedTestCase};
 
 #[derive(Debug)]
 pub enum RoomCommands {
@@ -33,13 +36,12 @@ pub enum ClientSentCommand {
     },
     BeginRound,
     SetEditorContent {
-        #[serde(rename = "questionId")]
-        question_id: String,
         content: String,
     },
     TestCode {
-        #[serde(rename = "customTestCase")]
-        custom_test_case: Option<TestCase>,
+        #[serde(rename = "testCases")]
+        test_cases: Vec<TestCase>,
+        language: String,
     },
     SubmitCode,
 }
@@ -65,6 +67,21 @@ pub enum ServerSentCommand {
         owner: PublicUser,
     },
     SetProblems(Option<Vec<ProblemPublic>>),
+    SetTestResponse(TestResponse),
+}
+
+#[derive(Serialize, Debug)]
+#[serde(tag = "t", content = "c")]
+pub enum TestResponse {
+    Error {
+        message: String,
+    },
+    Ran {
+        #[serde(rename = "failedTests")]
+        failed_tests: Vec<FailedTestCase>,
+        #[serde(rename = "okayTests")]
+        okay_tests: Vec<TestCase>,
+    },
 }
 
 #[derive(Deserialize, Debug)]
@@ -113,8 +130,8 @@ pub struct Room {
     config: RoomConfig,
     connections: HashMap<ConnId, (Sender<ConnectionCommands>, UserId)>,
     users: HashMap<UserId, (ConnId, User)>,
-    // user id -> (question id -> code)
-    editor_contents: HashMap<UserId, HashMap<String, String>>,
+    // user id -> code
+    editor_contents: HashMap<UserId, String>,
     chat_messages: VecDeque<ChatMessage>,
     problems: Vec<Problem>,
     round_in_progress: bool,
@@ -140,12 +157,12 @@ impl Room {
                     title: "Two Sum".into(),
                     description: "You know what this means".into(),
                     boilerplate_code: Code {
-                        javascript: "function twoSum(nums, target) {\n  \n}\n".into(),
-                        python: "def two_sum(nums, target):\n  pass\n".into(),
+                        javascript: "function solve(nums, target) {\n  \n}\n".into(),
+                        python: "def solve(nums, target):\n  pass\n".into(),
                     },
                     test_cases: vec![
                         TestCase {
-                            input: r#"[[2, 7, 11, 15], 6]"#.into(),
+                            input: r#"[[2, 7, 11, 15], 9]"#.into(),
                             output: "[0, 1]".into(),
                         },
                         TestCase {
@@ -159,8 +176,8 @@ impl Room {
                     title: "Roman to Integer".into(),
                     description: "Convert roman numerals to integers".into(),
                     boilerplate_code: Code {
-                        javascript: "function romanToInteger(romanNumeral) {\n  \n}\n".into(),
-                        python: "def roman_to_integer(roman_numeral):\n  pass\n".into(),
+                        javascript: "function solve(romanNumeral) {\n  \n}\n".into(),
+                        python: "def solve(roman_numeral):\n  pass\n".into(),
                     },
                     test_cases: vec![
                         TestCase {
@@ -262,8 +279,7 @@ impl Room {
                 ))
                 .await?;
 
-                self.editor_contents
-                    .insert(user_id.clone(), HashMap::default());
+                self.editor_contents.insert(user_id.clone(), String::new());
 
                 if self.round_in_progress {
                     self.send_all_command(&ServerSentCommand::SetProblems(Some(
@@ -274,7 +290,7 @@ impl Room {
                                 description: prob.description.clone(),
                                 title: prob.title.clone(),
                                 boilerplate_code: prob.boilerplate_code.clone(),
-                                default_test_case: prob.test_cases[0].clone(),
+                                default_test_cases: prob.test_cases[0..2].to_vec(),
                             })
                             .collect(),
                     )))
@@ -351,21 +367,51 @@ impl Room {
                                     description: prob.description.clone(),
                                     title: prob.title.clone(),
                                     boilerplate_code: prob.boilerplate_code.clone(),
-                                    default_test_case: prob.test_cases[0].clone(),
+                                    default_test_cases: prob.test_cases[0..2].to_vec(),
                                 })
                                 .collect(),
                         )))
                         .await?;
                         self.round_in_progress = true;
                     }
-                    ClientSentCommand::SetEditorContent {
-                        question_id,
-                        content,
-                    } => {
-                        log::info!("{:?} set {}", user_id, content);
+                    ClientSentCommand::SetEditorContent { content } => {
+                        log::info!("{}", content);
+                        self.editor_contents.insert(user_id.clone(), content);
                     }
-                    ClientSentCommand::TestCode { custom_test_case } => {
-                        log::info!("{:?} test {:?}", user_id, custom_test_case);
+                    ClientSentCommand::TestCode {
+                        test_cases,
+                        language,
+                    } => {
+                        if !["javascript", "python"].contains(&language.as_str()) {
+                            return Ok(false);
+                        }
+
+                        let code = match self.editor_contents.get(user_id) {
+                            Some(d) => d,
+                            None => return Ok(false),
+                        };
+
+                        match judge::judge(&language, &code, &test_cases).await {
+                            Err(err) => {
+                                self.send_connection(
+                                    &conn_id,
+                                    &ServerSentCommand::SetTestResponse(TestResponse::Error {
+                                        message: err.to_string(),
+                                    }),
+                                )
+                                .await?;
+                            }
+                            Ok(results) => {
+                                self.send_connection(
+                                    &conn_id,
+                                    &ServerSentCommand::SetTestResponse(TestResponse::Ran {
+                                        failed_tests: results.failed_tests,
+                                        okay_tests: results.okay_tests,
+                                    }),
+                                )
+                                .await?;
+                            }
+                        }
                     }
                     ClientSentCommand::SubmitCode => {
                         log::info!("{:?} submitted", user_id);

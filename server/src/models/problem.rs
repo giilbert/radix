@@ -25,7 +25,7 @@ pub struct ProblemPublic {
     pub title: String,
     pub description: String,
     pub boilerplate_code: Code,
-    pub default_test_case: TestCase,
+    pub default_test_cases: Vec<TestCase>,
 }
 
 #[derive(Serialize, Debug, Clone, Default)]

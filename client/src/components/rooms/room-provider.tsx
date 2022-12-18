@@ -50,10 +50,7 @@ type Problem = {
   title: string;
   description: string;
   boilerplateCode: BoilerplateCode;
-  defaultTestCase: {
-    input: string;
-    output: string;
-  };
+  defaultTestCases: TestCase[];
 };
 
 type ServerSentCommand = Enum<{
@@ -62,6 +59,7 @@ type ServerSentCommand = Enum<{
   SetUsers: RoomUser[];
   SetRoomConfig: RoomConfig;
   SetProblems: Problem[] | null;
+  SetTestResponse: TestResponse;
 }>;
 
 type ClientSentCommand = Enum<{
@@ -69,9 +67,33 @@ type ClientSentCommand = Enum<{
     content: string;
   };
   BeginRound: null;
-  SetEditorContent: { content: string; questionId: string };
-  TestCode: { customTestCase: { input: string; output: string } | null };
+  SetEditorContent: { content: string };
+  TestCode: {
+    language: string;
+    testCases: { input: string; output: string }[];
+  };
   SubmitCode: null;
+}>;
+
+export type TestCase = {
+  input: string;
+  output: string;
+};
+
+type TestStatus = Enum<{
+  None: null;
+  Awaiting: null;
+  Response: TestResponse;
+}>;
+
+type TestResponse = Enum<{
+  Error: {
+    message: string;
+  };
+  Ran: {
+    failedTests: (TestCase & { expected: string })[];
+    okayTests: TestCase[];
+  };
 }>;
 
 export const useRoomData = create<{
@@ -81,6 +103,7 @@ export const useRoomData = create<{
   problems: Problem[] | null;
   code: Map<number, Map<string, string>>;
   currentProblemIndex: number;
+  testStatus: TestStatus;
   setCurrentProblemIndex: (index: number) => void;
   addChatMessage: (message: ChatMessage) => void;
   setChatMessages: (messages: ChatMessage[]) => void;
@@ -88,6 +111,7 @@ export const useRoomData = create<{
   setRoomConfig: (roomConfig: RoomConfig) => void;
   setProblems: (problems: Problem[] | null) => void;
   setProblemCode: (problemId: number, language: string, code: string) => void;
+  setTestStatus: (status: TestStatus) => void;
 }>((set) => ({
   chatMessages: [],
   users: [],
@@ -95,6 +119,10 @@ export const useRoomData = create<{
   problems: null,
   code: new Map(),
   currentProblemIndex: 0,
+  testStatus: {
+    t: "None",
+    c: null,
+  },
   setChatMessages: (messages: ChatMessage[]) =>
     set({
       chatMessages: messages,
@@ -135,6 +163,10 @@ export const useRoomData = create<{
     }),
   setCurrentProblemIndex: (index: number) =>
     set({ currentProblemIndex: index }),
+  setTestStatus: (status: TestStatus) =>
+    set({
+      testStatus: status,
+    }),
 }));
 
 export const useRoom = () => {
@@ -164,6 +196,7 @@ export const RoomProvider: React.FC<
   const setUsers = useRoomData((s) => s.setUsers);
   const setRoomConfig = useRoomData((s) => s.setRoomConfig);
   const setProblems = useRoomData((s) => s.setProblems);
+  const setTestStatus = useRoomData((s) => s.setTestStatus);
 
   useEffect(() => {
     if (wsRef.current || !router.query.name) return;
@@ -191,6 +224,11 @@ export const RoomProvider: React.FC<
         setRoomConfig(data.c);
       } else if (data.t === "SetProblems") {
         setProblems(data.c);
+      } else if (data.t === "SetTestResponse") {
+        setTestStatus({
+          t: "Response",
+          c: data.c,
+        });
       }
     };
 
@@ -223,6 +261,7 @@ export const RoomProvider: React.FC<
     setUsers,
     setRoomConfig,
     setProblems,
+    setTestStatus,
   ]);
 
   if (closed) return <Text>Disconnected</Text>;

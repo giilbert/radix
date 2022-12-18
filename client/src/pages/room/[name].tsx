@@ -4,7 +4,6 @@ import { RoomProvider } from "@/components/rooms/room-provider";
 import { SidePanel } from "@/components/rooms/side-panel";
 import { GridItem, SimpleGrid } from "@chakra-ui/react";
 import { NextPage } from "next";
-import { useRouter } from "next/router";
 
 const RoomPage: NextPage = () => {
   return (

@@ -17,15 +17,25 @@ import { useRoom, useRoomData } from "./room-provider";
 import { useSession } from "next-auth/react";
 import { throttle } from "@/lib/utils/throttle";
 import { useState } from "react";
+import { TestResults } from "./test-results";
 
 export const Editors: React.FC = () => {
   const { data: session } = useSession();
   const room = useRoom();
-  const { users, problems, code, currentProblemIndex, setProblemCode } =
-    useRoomData();
+  const {
+    users,
+    problems,
+    code,
+    currentProblemIndex,
+    setProblemCode,
+    testStatus,
+    setTestStatus,
+  } = useRoomData();
   const [selectedLanguage, setSelectedLanguage] = useState<
     "python" | "javascript"
   >("python");
+
+  const isResultsActive = testStatus.t !== "None";
 
   if (users.length === 0) return <Text>Loading</Text>;
   if (!session) return <Text>Loading</Text>;
@@ -42,7 +52,7 @@ export const Editors: React.FC = () => {
           ))}
         </TabList>
 
-        <TabPanels h="calc(100vh - 6rem)">
+        <TabPanels h={`calc(100vh${isResultsActive ? " - 26rem" : " - 6rem"})`}>
           {users.map((user) => {
             return (
               <TabPanel p="0" h="100%" key={user.id}>
@@ -71,7 +81,6 @@ export const Editors: React.FC = () => {
                           t: "SetEditorContent",
                           c: {
                             content,
-                            questionId: problems[currentProblemIndex].id,
                           },
                         });
                     })}
@@ -83,41 +92,65 @@ export const Editors: React.FC = () => {
         </TabPanels>
       </Tabs>
 
-      <HStack alignItems="center" h="3rem" justify="flex-end" pr="1">
-        <Select
-          mr="auto"
-          w="36"
-          onChange={(event) => {
-            setSelectedLanguage(event.currentTarget.value.toLowerCase() as any);
-          }}
-        >
-          <option>Python</option>
-          <option>JavaScript</option>
-        </Select>
+      <Box>
+        {isResultsActive && <TestResults />}
 
-        <Button
-          w="28"
-          onClick={throttle(() => {
-            room.sendCommand({
-              t: "TestCode",
-              c: { customTestCase: null },
-            });
-          })}
-        >
-          Test
-        </Button>
-        <Button
-          w="28"
-          onClick={throttle(() => {
-            room.sendCommand({
-              t: "SubmitCode",
-              c: null,
-            });
-          })}
-        >
-          Submit
-        </Button>
-      </HStack>
+        <HStack alignItems="center" h="3rem" justify="flex-end" pr="1">
+          <Select
+            mr="auto"
+            w="36"
+            onChange={(event) => {
+              setSelectedLanguage(
+                event.currentTarget.value.toLowerCase() as any
+              );
+            }}
+          >
+            <option>Python</option>
+            {/* <option>JavaScript</option> */}
+          </Select>
+
+          <Button
+            w="28"
+            onClick={throttle(() => {
+              if (!problems) return;
+
+              console.log(problems[currentProblemIndex].defaultTestCases);
+
+              room.sendCommand({
+                t: "SetEditorContent",
+                c: {
+                  content:
+                    code.get(currentProblemIndex)?.get(selectedLanguage) || "",
+                },
+              });
+              setTestStatus({
+                t: "Awaiting",
+                c: null,
+              });
+              room.sendCommand({
+                t: "TestCode",
+                c: {
+                  language: selectedLanguage,
+                  testCases: problems[currentProblemIndex].defaultTestCases,
+                },
+              });
+            })}
+          >
+            Test
+          </Button>
+          <Button
+            w="28"
+            onClick={throttle(() => {
+              room.sendCommand({
+                t: "SubmitCode",
+                c: null,
+              });
+            })}
+          >
+            Submit
+          </Button>
+        </HStack>
+      </Box>
     </Box>
   );
 };
