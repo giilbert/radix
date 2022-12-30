@@ -1,6 +1,6 @@
 import { useRoom, useRoomData } from "./room-provider";
 import { CgEnter } from "react-icons/cg";
-import { IoMdExit } from "react-icons/io";
+import { TbConfetti, TbTrophy } from "react-icons/tb";
 import {
   Box,
   Flex,
@@ -13,7 +13,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { createRef, useEffect, useRef } from "react";
-import { FiFlag } from "react-icons/fi";
+import { FiFlag, FiUpload } from "react-icons/fi";
+
+const nth = (n: number) => {
+  return ["st", "nd", "rd"][((((n + 90) % 100) - 10) % 10) - 1] || "th";
+};
 
 export const Chat: React.FC = () => {
   const room = useRoom();
@@ -34,7 +38,7 @@ export const Chat: React.FC = () => {
         el.scrollTop = maxScroll;
       }
     }
-  }, [messages.length]);
+  }, [messages.length, containerRef]);
 
   useEffect(() => {
     if (containerRef.current && messages.length !== 0 && !hasInit.current) {
@@ -87,6 +91,29 @@ export const Chat: React.FC = () => {
                 Round began!
               </>
             )}
+
+            {v.t === "UserSubmitted" && (
+              <>
+                <FiUpload size={20} color="#777" />
+                {v.c.username} submitted
+              </>
+            )}
+
+            {v.t === "UserProblemCompletion" && (
+              <>
+                <TbConfetti size={20} color="#48BB78" />
+                {v.c.username} completed problem {v.c.problemIndex + 1}!
+              </>
+            )}
+
+            {v.t === "UserFinished" && (
+              <>
+                <TbTrophy size={20} color="#F4D03F" />
+                {v.c.username} completed in {v.c.place}
+                {nth(v.c.place)} place!
+              </>
+            )}
+
             {v.t === "Connection" && (
               <>
                 <CgEnter size={20} color="#777" />

@@ -3,18 +3,33 @@ import {
   Code,
   Heading,
   HStack,
+  Skeleton,
   Text,
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import { FiCheck, FiX } from "react-icons/fi";
 import { useRoomData } from "./room-provider";
 
 export const TestResults: React.FC = () => {
   const testStatus = useRoomData((s) => s.testStatus);
 
   return (
-    <Box w="full" h="20rem" bgColor="blackAlpha.400" p="2">
-      {testStatus.t === "Awaiting" && <Text>running ur stupid code...</Text>}
+    <Box
+      w="full"
+      h="20rem"
+      bgColor="blackAlpha.400"
+      p="2"
+      overflow={testStatus.t === "Awaiting" ? "hidden" : "auto"}
+    >
+      {testStatus.t === "Awaiting" && (
+        <Box>
+          <Heading fontSize="1.4rem">Running ur stupid code...</Heading>
+          <Skeleton w="full" h="24" mt="2" borderRadius="md" />
+          <Skeleton w="full" h="24" mt="2" borderRadius="md" />
+          <Skeleton w="full" h="24" mt="2" borderRadius="md" />
+        </Box>
+      )}
       {testStatus.t === "Response" && testStatus.c.t === "Ran" && (
         <>
           {testStatus.c.c.failedTests.length > 0 && (
@@ -54,19 +69,24 @@ export const TestResults: React.FC = () => {
           {testStatus.c.c.okayTests.map((testCase, i) => (
             <HStack
               key={i}
-              bgColor="green.600"
+              border="solid 2px"
+              borderColor="green.600"
               w="full"
               p="2"
               borderRadius="sm"
+              mt="1"
             >
-              <Code bgColor="gray.800">{testCase.input}</Code>
+              <FiCheck />
+              <Code bgColor="gray.800">
+                {testCase.input} =&gt; {testCase.output}
+              </Code>
             </HStack>
           ))}
         </>
       )}
       {testStatus.t === "Response" && testStatus.c.t === "Error" && (
         <Textarea
-          defaultValue={"Error:\n================" + testStatus.c.c.message}
+          defaultValue={testStatus.c.c.message}
           fontFamily="mono"
           h="full"
           contentEditable={false}
@@ -74,6 +94,14 @@ export const TestResults: React.FC = () => {
           spellCheck="false"
           resize="none"
         />
+      )}
+
+      {testStatus.t === "Response" && testStatus.c.t === "AllTestsPassed" && (
+        <>
+          <Heading ml="2">yay</Heading>
+          <Text ml="2">all tests passed!</Text>
+          <Text ml="2">go on to the next question!!!</Text>
+        </>
       )}
     </Box>
   );

@@ -1,6 +1,6 @@
 use mongodb::bson::{oid::ObjectId, Uuid};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use tokio::{
     sync::mpsc::{self, Receiver, Sender},
     task::JoinHandle,
@@ -43,7 +43,11 @@ pub enum ClientSentCommand {
         test_cases: Vec<TestCase>,
         language: String,
     },
-    SubmitCode,
+    SubmitCode {
+        #[serde(rename = "problemIndex")]
+        problem_index: u32,
+        language: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -82,6 +86,9 @@ pub enum TestResponse {
         #[serde(rename = "okayTests")]
         okay_tests: Vec<TestCase>,
     },
+    AllTestsPassed {
+        runtime: u32,
+    },
 }
 
 #[derive(Deserialize, Debug)]
@@ -108,10 +115,29 @@ pub struct Author {
 #[derive(Serialize, Debug, Clone)]
 #[serde(tag = "t", content = "c")]
 pub enum ChatMessage {
-    UserChat { author: PublicUser, content: String },
-    Connection { username: String },
-    Disconnection { username: String },
+    UserChat {
+        author: PublicUser,
+        content: String,
+    },
+    Connection {
+        username: String,
+    },
+    Disconnection {
+        username: String,
+    },
     RoundBegin,
+    UserSubmitted {
+        username: String,
+    },
+    UserProblemCompletion {
+        username: String,
+        #[serde(rename = "problemIndex")]
+        problem_index: u32,
+    },
+    UserFinished {
+        username: String,
+        place: u32,
+    },
     RoundEnd,
     Bad,
 }
@@ -135,6 +161,8 @@ pub struct Room {
     chat_messages: VecDeque<ChatMessage>,
     problems: Vec<Problem>,
     round_in_progress: bool,
+    problem_completion: HashMap<UserId, HashSet<u32>>,
+    users_who_finished: u32,
     pub id: Uuid,
 }
 
@@ -151,45 +179,109 @@ impl Room {
             users: Default::default(),
             chat_messages: Default::default(),
             editor_contents: Default::default(),
+            problem_completion: Default::default(),
+            users_who_finished: 0,
             problems: vec![
                 Problem {
                     id: ObjectId::new(),
-                    title: "Two Sum".into(),
-                    description: "You know what this means".into(),
+                    title: "Is Even".to_string(),
+                    description: "Return if the number is even".to_string(),
                     boilerplate_code: Code {
-                        javascript: "function solve(nums, target) {\n  \n}\n".into(),
-                        python: "def solve(nums, target):\n  pass\n".into(),
+                        javascript: "function solve(n) {\n  \n}\n".into(),
+                        python: "def solve(n):\n  pass\n".into(),
                     },
                     test_cases: vec![
                         TestCase {
-                            input: r#"[[2, 7, 11, 15], 9]"#.into(),
-                            output: "[0, 1]".into(),
+                            input: r#"[3]"#.into(),
+                            output: "false".into(),
                         },
                         TestCase {
-                            input: r#"[[3, 2, 4], 6]"#.into(),
-                            output: "[1, 2]".into(),
+                            input: r#"[1]"#.into(),
+                            output: "false".into(),
+                        },
+                        TestCase {
+                            input: r#"[4]"#.into(),
+                            output: "true".into(),
+                        },
+                        TestCase {
+                            input: r#"[4913]"#.into(),
+                            output: "false".into(),
+                        },
+                        TestCase {
+                            input: r#"[3192]"#.into(),
+                            output: "true".into(),
                         },
                     ],
                 },
                 Problem {
                     id: ObjectId::new(),
-                    title: "Roman to Integer".into(),
-                    description: "Convert roman numerals to integers".into(),
+                    title: "Is Prime".to_string(),
+                    description: "Return if the number is prime".to_string(),
                     boilerplate_code: Code {
-                        javascript: "function solve(romanNumeral) {\n  \n}\n".into(),
-                        python: "def solve(roman_numeral):\n  pass\n".into(),
+                        javascript: "function solve(n) {\n  \n}\n".into(),
+                        python: "def solve(n):\n  pass\n".into(),
                     },
                     test_cases: vec![
                         TestCase {
-                            input: r#""MCMXCIV""#.into(),
-                            output: "1994".into(),
+                            input: r#"[3]"#.into(),
+                            output: "true".into(),
                         },
                         TestCase {
-                            input: r#"LVIII"#.into(),
-                            output: "58".into(),
+                            input: r#"[1]"#.into(),
+                            output: "true".into(),
+                        },
+                        TestCase {
+                            input: r#"[4]"#.into(),
+                            output: "false".into(),
+                        },
+                        TestCase {
+                            input: r#"[4913]"#.into(),
+                            output: "false".into(),
+                        },
+                        TestCase {
+                            input: r#"[3192]"#.into(),
+                            output: "false".into(),
                         },
                     ],
                 },
+                // Problem {
+                //     id: ObjectId::new(),
+                //     title: "Two Sum".into(),
+                //     description: "You know what this means".into(),
+                //     boilerplate_code: Code {
+                //         javascript: "function solve(nums, target) {\n  \n}\n".into(),
+                //         python: "def solve(nums, target):\n  pass\n".into(),
+                //     },
+                //     test_cases: vec![
+                //         TestCase {
+                //             input: r#"[[2, 7, 11, 15], 9]"#.into(),
+                //             output: "[0, 1]".into(),
+                //         },
+                //         TestCase {
+                //             input: r#"[[3, 2, 4], 6]"#.into(),
+                //             output: "[1, 2]".into(),
+                //         },
+                //     ],
+                // },
+                // Problem {
+                //     id: ObjectId::new(),
+                //     title: "Roman to Integer".into(),
+                //     description: "Convert roman numerals to integers".into(),
+                //     boilerplate_code: Code {
+                //         javascript: "function solve(romanNumeral) {\n  \n}\n".into(),
+                //         python: "def solve(roman_numeral):\n  pass\n".into(),
+                //     },
+                //     test_cases: vec![
+                //         TestCase {
+                //             input: r#""MCMXCIV""#.into(),
+                //             output: "1994".into(),
+                //         },
+                //         TestCase {
+                //             input: r#"LVIII"#.into(),
+                //             output: "58".into(),
+                //         },
+                //     ],
+                // },
             ],
             round_in_progress: false,
             id,
@@ -280,6 +372,8 @@ impl Room {
                 .await?;
 
                 self.editor_contents.insert(user_id.clone(), String::new());
+                self.problem_completion
+                    .insert(user_id.clone(), HashSet::default());
 
                 if self.round_in_progress {
                     self.send_all_command(&ServerSentCommand::SetProblems(Some(
@@ -309,8 +403,14 @@ impl Room {
                     username: user.name,
                 })
                 .await?;
+
                 self.editor_contents.remove(&user_id).ok_or_else(|| {
-                    anyhow::anyhow!("Trying to remove a editor content from an nonexistent user.")
+                    anyhow::anyhow!("Trying to remove a editor content from a nonexistent user.")
+                })?;
+                self.problem_completion.remove(&user_id).ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Trying to remove a problem completion from a nonexistent user."
+                    )
                 })?;
 
                 self.send_all_command(&ServerSentCommand::SetUsers(
@@ -367,7 +467,7 @@ impl Room {
                                     description: prob.description.clone(),
                                     title: prob.title.clone(),
                                     boilerplate_code: prob.boilerplate_code.clone(),
-                                    default_test_cases: prob.test_cases[0..2].to_vec(),
+                                    default_test_cases: prob.test_cases[0..3].to_vec(),
                                 })
                                 .collect(),
                         )))
@@ -375,7 +475,6 @@ impl Room {
                         self.round_in_progress = true;
                     }
                     ClientSentCommand::SetEditorContent { content } => {
-                        log::info!("{}", content);
                         self.editor_contents.insert(user_id.clone(), content);
                     }
                     ClientSentCommand::TestCode {
@@ -413,8 +512,91 @@ impl Room {
                             }
                         }
                     }
-                    ClientSentCommand::SubmitCode => {
-                        log::info!("{:?} submitted", user_id);
+                    ClientSentCommand::SubmitCode {
+                        language,
+                        problem_index,
+                    } => {
+                        if !["javascript", "python"].contains(&language.as_str()) {
+                            return Ok(false);
+                        }
+
+                        let user_id = UserId(user.id.to_string());
+                        let username = user.name.clone();
+                        self.send_chat_message(ChatMessage::UserSubmitted {
+                            username: username.clone(),
+                        })
+                        .await?;
+
+                        let code = match self.editor_contents.get(&user_id) {
+                            Some(d) => d,
+                            None => return Ok(false),
+                        };
+
+                        let problem = match self.problems.get(problem_index as usize) {
+                            Some(p) => p,
+                            None => return Ok(false),
+                        };
+                        let test_cases = problem.test_cases.as_slice();
+
+                        match judge::judge(&language, &code, test_cases).await {
+                            Err(err) => {
+                                self.send_connection(
+                                    &conn_id,
+                                    &ServerSentCommand::SetTestResponse(TestResponse::Error {
+                                        message: err.to_string(),
+                                    }),
+                                )
+                                .await?;
+                            }
+                            Ok(results) => {
+                                if results.failed_tests.len() == 0 {
+                                    self.send_connection(
+                                        &conn_id,
+                                        &ServerSentCommand::SetTestResponse(
+                                            TestResponse::AllTestsPassed { runtime: 328921920 },
+                                        ),
+                                    )
+                                    .await?;
+
+                                    self.send_chat_message(ChatMessage::UserProblemCompletion {
+                                        username: username.clone(),
+                                        problem_index,
+                                    })
+                                    .await?;
+
+                                    if let Some(completion) =
+                                        self.problem_completion.get_mut(&user_id)
+                                    {
+                                        if completion.len() == self.problems.len() {
+                                            return Ok(false);
+                                        }
+
+                                        completion.insert(problem_index);
+                                        if completion.len() == self.problems.len() {
+                                            self.users_who_finished += 1;
+                                            self.send_chat_message(ChatMessage::UserFinished {
+                                                username: username.clone(),
+                                                place: self.users_who_finished,
+                                            })
+                                            .await?;
+                                        }
+                                    }
+                                } else {
+                                    self.send_connection(
+                                        &conn_id,
+                                        &ServerSentCommand::SetTestResponse(TestResponse::Ran {
+                                            failed_tests: results
+                                                .failed_tests
+                                                .get(0..1)
+                                                .unwrap_or(&[])
+                                                .to_vec(),
+                                            okay_tests: vec![],
+                                        }),
+                                    )
+                                    .await?;
+                                }
+                            }
+                        }
                     }
                 }
             }

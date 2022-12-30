@@ -141,9 +141,16 @@ export const Editors: React.FC = () => {
           <Button
             w="28"
             onClick={throttle(() => {
+              setTestStatus({
+                t: "Awaiting",
+                c: null,
+              });
               room.sendCommand({
                 t: "SubmitCode",
-                c: null,
+                c: {
+                  problemIndex: currentProblemIndex,
+                  language: selectedLanguage,
+                },
               });
             })}
           >

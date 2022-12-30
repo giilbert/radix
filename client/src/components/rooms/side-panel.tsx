@@ -12,8 +12,13 @@ import { useRoom, useRoomData } from "./room-provider";
 export const SidePanel: React.FC = () => {
   const router = useRouter();
   const { data: session } = useSession();
-  const { problems, roomConfig, setCurrentProblemIndex, currentProblemIndex } =
-    useRoomData();
+  const {
+    problems,
+    roomConfig,
+    setCurrentProblemIndex,
+    currentProblemIndex,
+    setTestStatus,
+  } = useRoomData();
   const room = useRoom();
 
   if (!session || !roomConfig) return <Text>Loading</Text>;
@@ -55,6 +60,10 @@ export const SidePanel: React.FC = () => {
             <HStack ml="auto !important" gap="1">
               <Button
                 onClick={() => {
+                  setTestStatus({
+                    t: "None",
+                    c: null,
+                  });
                   if (currentProblemIndex !== 0)
                     setCurrentProblemIndex(currentProblemIndex - 1);
                 }}
@@ -70,6 +79,10 @@ export const SidePanel: React.FC = () => {
 
               <Button
                 onClick={() => {
+                  setTestStatus({
+                    t: "None",
+                    c: null,
+                  });
                   if (currentProblemIndex !== (problems?.length || 0) - 1)
                     setCurrentProblemIndex(currentProblemIndex + 1);
                 }}

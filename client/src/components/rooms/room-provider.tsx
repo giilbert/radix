@@ -26,6 +26,17 @@ type ChatMessage = Enum<{
   };
   RoundBegin: null;
   RoundEnd: null;
+  UserSubmitted: {
+    username: string;
+  };
+  UserProblemCompletion: {
+    username: string;
+    problemIndex: number;
+  };
+  UserFinished: {
+    username: string;
+    place: number;
+  };
 }>;
 
 type RoomUser = {
@@ -72,7 +83,10 @@ type ClientSentCommand = Enum<{
     language: string;
     testCases: { input: string; output: string }[];
   };
-  SubmitCode: null;
+  SubmitCode: {
+    problemIndex: number;
+    language: string;
+  };
 }>;
 
 export type TestCase = {
@@ -93,6 +107,9 @@ type TestResponse = Enum<{
   Ran: {
     failedTests: (TestCase & { expected: string })[];
     okayTests: TestCase[];
+  };
+  AllTestsPassed: {
+    runtime: number;
   };
 }>;
 

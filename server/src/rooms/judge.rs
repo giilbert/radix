@@ -25,8 +25,9 @@ pub async fn judge(
     code: &String,
     test_cases: &[TestCase],
 ) -> anyhow::Result<JudgingResults> {
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
     let client = Client::with_url("http://localhost:2000/api/v2");
-    // let client = Client::new();
     let executor = Executor::new()
         .set_language("python")
         .set_version("3.10.0")
@@ -48,8 +49,6 @@ pub async fn judge(
         ));
     }
 
-    log::info!("{:#?}", result.run);
-
     let output = serde_json::from_str::<Vec<Value>>(
         result
             .run
@@ -66,7 +65,6 @@ pub async fn judge(
     let mut okay_tests = vec![];
 
     for (got, test_case) in output.iter().zip(test_cases) {
-        log::info!("{}", got.to_string());
         if got.to_string()
             == serde_json::to_string(&serde_json::from_str::<Value>(&test_case.output)?)?
         {
@@ -80,12 +78,12 @@ pub async fn judge(
         }
     }
 
-    log::info!(
-        "{:#?}\n\nfailed: {:?}\n\nokay: {:?}",
-        result,
-        failed_tests,
-        okay_tests
-    );
+    //     log::info!(
+    //         "{:#?}\n\nfailed: {:?}\n\nokay: {:?}",
+    //         result,
+    //         failed_tests,
+    //         okay_tests
+    //     );
 
     Ok(JudgingResults {
         failed_tests,
@@ -100,7 +98,6 @@ fn python_runner(test_cases: &[TestCase]) -> anyhow::Result<String> {
         .filter(|possible| possible.is_ok())
         .map(|p| p.unwrap())
         .collect::<Vec<Value>>();
-    log::info!("{:?}", inputs);
 
     let code = format!(
         r#"""
