@@ -5,9 +5,6 @@ declare module "next-auth" {
   interface Session extends DefaultSession {
     user: User;
   }
-  interface User extends DefaultUser {
-    sessionToken: string;
-  }
 }
 
 declare module "next-auth/adapters" {
