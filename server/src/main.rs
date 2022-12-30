@@ -45,7 +45,10 @@ async fn main() -> anyhow::Result<()> {
             header::CONTENT_LENGTH,
         ])
         .allow_credentials(true)
-        .allow_origin(["http://localhost:3000".parse()?]);
+        .allow_origin([
+            "https://radix.gilbertz.works".parse()?,
+            "http://localhost:3000".parse()?,
+        ]);
 
     let app = Router::<AppState>::new()
         .nest("/auth", auth_routes())
