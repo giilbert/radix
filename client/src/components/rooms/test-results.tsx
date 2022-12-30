@@ -24,7 +24,14 @@ export const TestResults: React.FC = () => {
           )}
           <VStack alignItems="start">
             {testStatus.c.c.failedTests.map((testCase, i) => (
-              <Box key={i} bgColor="red.600" w="full" p="2" borderRadius="sm">
+              <Box
+                key={i}
+                border="solid 2px"
+                borderColor="red.500"
+                w="full"
+                p="2"
+                borderRadius="md"
+              >
                 <Code bgColor="gray.800">Input: {testCase.input}</Code> <br />
                 <Code bgColor="gray.800">Expected: {testCase.expected}</Code>
                 <br />
@@ -59,11 +66,11 @@ export const TestResults: React.FC = () => {
       )}
       {testStatus.t === "Response" && testStatus.c.t === "Error" && (
         <Textarea
-          defaultValue={testStatus.c.c.message}
+          defaultValue={"Error:\n================" + testStatus.c.c.message}
           fontFamily="mono"
           h="full"
           contentEditable={false}
-          color="whiteAlpha.900"
+          color="red.600"
           spellCheck="false"
           resize="none"
         />
