@@ -27,7 +27,11 @@ pub async fn judge(
 ) -> anyhow::Result<JudgingResults> {
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
-    let client = Client::with_url("http://localhost:2000/api/v2");
+    let client = if let Ok(url) = dotenvy::var("PISTON_URL") {
+        Client::with_url(&url)
+    } else {
+        Client::default()
+    };
     let executor = Executor::new()
         .set_language("python")
         .set_version("3.10.0")

@@ -8,26 +8,6 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: ferris
       MONGO_INITDB_ROOT_PASSWORD: rusty
-    networks:
-      - mongo-network
-
-  mongo-express:
-    image: mongo-express
-    ports:
-      - 8081:8081
-    environment:
-      ME_CONFIG_MONGODB_SERVER: mongo
-      ME_CONFIG_MONGODB_ADMINUSERNAME: ferris
-      ME_CONFIG_MONGODB_ADMINPASSWORD: rusty
-    depends_on:
-      - mongo
-    networks:
-      - mongo-network
-
-  redis:
-    image: redis
-    ports:
-      - 6379:6379
 
   piston:
     image: ghcr.io/engineer-man/piston
@@ -40,9 +20,4 @@ services:
     tmpfs:
       - /piston/jobs:exec,uid=1000,gid=1000,mode=711
       - /tmp:exec
-
-
-networks:
-  mongo-network:
-    driver: bridge
 
