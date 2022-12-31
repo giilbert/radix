@@ -9,7 +9,6 @@ async-recursion = "1.0.0"
 axum = { version = "0.6.1", features = ["ws"] }
 chrono = { version = "0.4.22", features = ["serde"] }
 dotenvy = "0.15.6"
-fred = "5.2.0"
 futures-util = "0.3.25"
 lazy_static = "1.4.0"
 log = "0.4.17"

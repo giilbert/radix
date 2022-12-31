@@ -15,10 +15,11 @@ pub async fn verify_user(token: &String) -> Result<bool, RouteErr> {
         token
     ))
     .await
-    .map_err(|_| {
+    .map_err(|e| {
+        log::error!("Google OAuth token verification error: {}", e);
         RouteErr::Msg(
             StatusCode::INTERNAL_SERVER_ERROR,
-            "An error occurred.".into(),
+            "An error occurred during verification.".into(),
         )
     })?;
 

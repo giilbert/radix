@@ -11,11 +11,16 @@ export function CustomAdapter(): Adapter {
   return {
     createUser: async (user) => {
       console.log("createUser", user);
-      const res = await axios.post("auth/user", {
-        ...user,
-        accounts: [],
-        sessions: [],
-      });
+      let res: any;
+      try {
+        res = await axios.post("auth/user", {
+          ...user,
+          accounts: [],
+          sessions: [],
+        });
+      } catch (e) {
+        console.log(e);
+      }
       return res.data;
     },
 
