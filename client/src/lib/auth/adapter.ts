@@ -10,7 +10,7 @@ export const axios = defaultAxios.create({
 export function CustomAdapter(): Adapter {
   return {
     createUser: async (user) => {
-      // console.log("createUser", user);
+      console.log("createUser", user);
       const res = await axios.post("auth/user", {
         ...user,
         accounts: [],
@@ -20,8 +20,8 @@ export function CustomAdapter(): Adapter {
     },
 
     getUser: async (id) => {
-      // console.log("getUser", id);
-      const res = await axios.post("auth/user/" + id);
+      console.log("getUser", id);
+      const res = await axios.get("auth/user/" + id);
       if (res.status === 200) return res.data;
       console.error(res.data);
       return null;
