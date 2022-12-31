@@ -21,9 +21,10 @@ export default NextAuth({
       name: "next-auth.session-token",
       options: {
         httpOnly: false,
-        sameSite: "lax",
+        sameSite: "None",
         path: "/",
         secure: true,
+        domain: "gilbertz.works",
       },
     },
   },

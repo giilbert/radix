@@ -48,6 +48,7 @@ async fn main() -> anyhow::Result<()> {
         .allow_origin([
             "https://radix.gilbertz.works".parse()?,
             "http://localhost:3000".parse()?,
+            "http://127.0.0.1:3000".parse()?,
         ]);
 
     let app = Router::<AppState>::new()
