@@ -14,9 +14,11 @@ export const Authed: React.FC<
   if (status === "unauthenticated")
     return (
       <Center w="100vw" h="100vh">
-        <Box>
-          <Heading>Please sign in to access this page</Heading>
-          <Button onClick={() => signIn("google")}>Sign in with Google</Button>
+        <Box bg="whiteAlpha.100" p="8" borderRadius="md">
+          <Heading>Sign in to access this page</Heading>
+          <Button onClick={() => signIn("google")} mt="2">
+            Sign in with Google
+          </Button>
         </Box>
       </Center>
     );

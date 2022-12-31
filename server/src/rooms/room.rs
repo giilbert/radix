@@ -10,7 +10,7 @@ use tokio::{
 use crate::{
     models::{
         problem::{Code, Problem, ProblemPublic, TestCase},
-        user::User,
+        user::{PublicUser, User},
     },
     rooms::judge,
 };
@@ -48,13 +48,6 @@ pub enum ClientSentCommand {
         problem_index: u32,
         language: String,
     },
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct PublicUser {
-    id: String,
-    name: String,
-    image: String,
 }
 
 #[derive(Serialize, Debug)]
@@ -98,7 +91,7 @@ pub struct CreateRoom {
     pub public: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct RoomConfig {
     pub name: String,
     pub public: bool,

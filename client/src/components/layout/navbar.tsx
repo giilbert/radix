@@ -24,6 +24,9 @@ export const Navbar: React.FC = () => {
     >
       <HStack w="6xl">
         <Heading fontSize="lg">Radix</Heading>
+        <Heading fontWeight="normal" fontSize="sm">
+          a binarysearch clone
+        </Heading>
 
         {status !== "loading" && (
           <HStack ml="auto !important" pr="2">

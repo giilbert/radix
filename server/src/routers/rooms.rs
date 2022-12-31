@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     errors::RouteErr,
-    models::user::User,
+    models::user::{PublicUser, User},
     rooms::{
         connection::Connection,
         room::{CreateRoom, Room, RoomConfig, ServerSentCommand},
@@ -23,6 +23,7 @@ use crate::{
 pub fn room_routes() -> Router<AppState, Body> {
     Router::new()
         .route("/", post(create_room))
+        .route("/list", get(list_rooms))
         .route("/:name/can-connect", get(can_connect))
         .route("/:name", get(connect))
 }
@@ -140,4 +141,25 @@ async fn connect(
 
         state.write().users_connected.remove(&user.id.to_string());
     }))
+}
+
+#[derive(Serialize)]
+struct RoomListData {
+    name: String,
+    owner: PublicUser,
+}
+
+async fn list_rooms(State(state): State<AppState>) -> Result<Json<Vec<RoomListData>>, RouteErr> {
+    let rooms = state
+        .read()
+        .rooms
+        .iter()
+        .filter(|(_, (config, _))| config.public)
+        .map(|(_, (config, _))| RoomListData {
+            name: config.name.clone(),
+            owner: config.owner.to_public(),
+        })
+        .collect::<Vec<_>>();
+
+    Ok(Json(rooms))
 }

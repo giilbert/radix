@@ -26,6 +26,13 @@ pub struct User {
     pub sessions: Vec<Session>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PublicUser {
+    pub id: String,
+    pub name: String,
+    pub image: String,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateUser {
@@ -254,5 +261,15 @@ where
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         let db = parts.extensions.get::<Db>().unwrap();
         Ok(Self(db.clone()))
+    }
+}
+
+impl User {
+    pub fn to_public(&self) -> PublicUser {
+        PublicUser {
+            id: self.id.to_string(),
+            name: self.name.clone(),
+            image: self.image.clone(),
+        }
     }
 }
