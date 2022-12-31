@@ -24,7 +24,7 @@ export const TestResults: React.FC = () => {
     >
       {testStatus.t === "Awaiting" && (
         <Box>
-          <Heading fontSize="1.4rem">Running ur stupid code...</Heading>
+          <Heading fontSize="1.4rem">Running...</Heading>
           <Skeleton w="full" h="24" mt="2" borderRadius="md" />
           <Skeleton w="full" h="24" mt="2" borderRadius="md" />
           <Skeleton w="full" h="24" mt="2" borderRadius="md" />

@@ -1,6 +1,8 @@
 import { BACKEND_URL } from "@/utils/consts";
 import { Enum } from "@/utils/enum";
 import { Text } from "@chakra-ui/react";
+import { useQuery } from "@tanstack/react-query";
+import { AxiosError } from "axios";
 import { useRouter } from "next/router";
 import {
   createContext,
@@ -12,6 +14,7 @@ import {
   useState,
 } from "react";
 import create from "zustand";
+import { UhOh } from "../ui/uh-oh";
 
 type ChatMessage = Enum<{
   Connection: {
@@ -208,6 +211,18 @@ export const RoomProvider: React.FC<
   const wsRef = useRef<WebSocket>();
   const [loading, setLoading] = useState(true);
   const [closed, setClosed] = useState(false);
+  const canConnectQuery = useQuery<
+    {
+      canConnect: boolean;
+      reason: string;
+    },
+    AxiosError
+  >([`room/${router.query.name}/can-connect`], {
+    enabled: !!router.query.name,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+  });
+
   const addChatMessage = useRoomData((s) => s.addChatMessage);
   const setChatMessages = useRoomData((s) => s.setChatMessages);
   const setUsers = useRoomData((s) => s.setUsers);
@@ -216,9 +231,14 @@ export const RoomProvider: React.FC<
   const setTestStatus = useRoomData((s) => s.setTestStatus);
 
   useEffect(() => {
-    if (wsRef.current || !router.query.name) return;
+    if (
+      wsRef.current ||
+      !router.query.name ||
+      !canConnectQuery.data ||
+      !canConnectQuery.data.canConnect
+    )
+      return;
 
-    console.log("constructing websocket", wsRef.current);
     wsRef.current = new WebSocket(
       BACKEND_URL.replace("http", "ws") + `/room/${router.query.name}`
     );
@@ -230,7 +250,6 @@ export const RoomProvider: React.FC<
     const onMessage = (e: MessageEvent) => {
       const data: ServerSentCommand = JSON.parse(e.data);
 
-      console.log(data);
       if (data.t === "ChatMessage") {
         addChatMessage(data.c);
       } else if (data.t === "ChatHistory") {
@@ -272,6 +291,7 @@ export const RoomProvider: React.FC<
       wsRef.current = undefined;
     };
   }, [
+    canConnectQuery.data,
     router.query.name,
     addChatMessage,
     setChatMessages,
@@ -280,6 +300,18 @@ export const RoomProvider: React.FC<
     setProblems,
     setTestStatus,
   ]);
+
+  if (canConnectQuery.status === "loading") return <Text>Loading</Text>;
+  if (!canConnectQuery.data?.canConnect) {
+    const reason = canConnectQuery.data?.reason || "";
+
+    return (
+      <UhOh
+        code={reason === "Room does not exist." ? "NOT_FOUND" : "FORBIDDEN"}
+        message={`Unable to connect: ${canConnectQuery.data?.reason}`}
+      />
+    );
+  }
 
   if (closed) return <Text>Disconnected</Text>;
   if (loading) return <Text>Loading</Text>;

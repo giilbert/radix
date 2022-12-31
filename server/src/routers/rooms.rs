@@ -8,7 +8,7 @@ use axum::{
 use futures_util::SinkExt;
 use mongodb::bson::Uuid;
 use reqwest::StatusCode;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     errors::RouteErr,
@@ -23,7 +23,7 @@ use crate::{
 pub fn room_routes() -> Router<AppState, Body> {
     Router::new()
         .route("/", post(create_room))
-        .route("/can-connect", get(can_connect))
+        .route("/:name/can-connect", get(can_connect))
         .route("/:name", get(connect))
 }
 
@@ -72,14 +72,31 @@ async fn create_room(
 #[serde(rename_all = "camelCase")]
 struct CanConnectResponse {
     can_connect: bool,
+    reason: String,
 }
 
 async fn can_connect(
     user: User,
+    Path(room_name): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<CanConnectResponse>, RouteErr> {
+    if state.read().users_connected.contains(&user.id.to_string()) {
+        return Ok(Json(CanConnectResponse {
+            can_connect: false,
+            reason: "You are already connected to a room.".to_string(),
+        }));
+    }
+
+    if !state.read().rooms.contains_key(&room_name) {
+        return Ok(Json(CanConnectResponse {
+            can_connect: false,
+            reason: "Room does not exist.".to_string(),
+        }));
+    }
+
     Ok(Json(CanConnectResponse {
-        can_connect: state.read().users_connected.contains(&user.id.to_string()),
+        can_connect: true,
+        reason: "".to_string(),
     }))
 }
 

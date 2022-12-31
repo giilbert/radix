@@ -2,7 +2,7 @@ import { Box, HStack, Code } from "@chakra-ui/react";
 import { AxiosError } from "axios";
 import { FiX } from "react-icons/fi";
 
-export const ErrorMessage: React.FC<{
+export const AxiosErrorMessage: React.FC<{
   error?: AxiosError | null;
 }> = ({ error }) => {
   if (!error) return null;

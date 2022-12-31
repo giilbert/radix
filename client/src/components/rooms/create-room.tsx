@@ -1,23 +1,20 @@
 import { useZodForm } from "@/lib/hooks/use-zod-form";
 import { axios } from "@/utils/axios";
 import {
-  Box,
   Button,
   Checkbox,
   FormControl,
   FormErrorMessage,
   FormLabel,
   Input,
-  Text,
   VStack,
 } from "@chakra-ui/react";
 import { useMutation } from "@tanstack/react-query";
 import { AxiosError } from "axios";
-import { useRouter } from "next/router";
 import { useCallback } from "react";
 import { Controller } from "react-hook-form";
 import { z } from "zod";
-import { ErrorMessage } from "../ui/error-message";
+import { AxiosErrorMessage } from "../ui/axios-error-message";
 
 const SPECIAL_CHARACTERS_REGEX = /[^a-zA-Z0-9_-]/g;
 const formSchema = z.object({
@@ -85,7 +82,7 @@ export const CreateRoom: React.FC = () => {
         Create
       </Button>
 
-      <ErrorMessage error={createRoom.error} />
+      <AxiosErrorMessage error={createRoom.error} />
     </form>
   );
 };
