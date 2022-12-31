@@ -34,6 +34,20 @@ pub type AppState = Arc<RwLock<AppStateInner>>;
 async fn main() -> anyhow::Result<()> {
     pretty_env_logger::init();
 
+    log::info!(
+        r#"Radix server starting up...
+-----------------------------------------------------------------
+| build timestamp      : {}
+| git commit hash      : {}
+| git commit timestamp : {}
+| rustc version        : {}
+-----------------------------------------------------------------"#,
+        env!("VERGEN_BUILD_TIMESTAMP"),
+        env!("VERGEN_GIT_SHA"),
+        env!("VERGEN_GIT_COMMIT_TIMESTAMP"),
+        env!("VERGEN_RUSTC_SEMVER")
+    );
+
     let db = Db::connect().await?;
     let app_state = AppState::default();
 
