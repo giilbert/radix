@@ -81,7 +81,9 @@ const Home: NextPage = () => {
         </VStack>
       )}
       {roomsQuery.status === "error" && (
-        <AxiosErrorMessage error={roomsQuery.error} />
+        <Box mt="4">
+          <AxiosErrorMessage error={roomsQuery.error} />
+        </Box>
       )}
       {roomsQuery.status === "success" && (
         <VStack mt="4">
