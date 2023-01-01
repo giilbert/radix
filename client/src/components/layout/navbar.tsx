@@ -19,10 +19,9 @@ export const Navbar: React.FC = () => {
       left="0"
       w="100vw"
       h="14"
-      pl="4"
       bg="whiteAlpha.50"
     >
-      <HStack w="6xl">
+      <HStack w="6xl" mx="4">
         <Heading fontSize="lg">Radix</Heading>
         <Heading fontWeight="normal" fontSize="sm">
           a binarysearch clone
