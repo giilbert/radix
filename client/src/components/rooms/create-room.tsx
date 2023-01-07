@@ -49,7 +49,7 @@ export const CreateRoom: React.FC = () => {
   return (
     <form onSubmit={form.handleSubmit(onSubmit)}>
       <VStack gap="2">
-        <FormControl>
+        <FormControl isRequired isInvalid={!!errors.name}>
           <FormLabel htmlFor="name">Room Name</FormLabel>
           <Controller
             name="name"
@@ -74,7 +74,6 @@ export const CreateRoom: React.FC = () => {
           <Checkbox size="lg" {...form.register("public")} autoComplete="off">
             Public
           </Checkbox>
-          <FormErrorMessage>{errors.public?.message}</FormErrorMessage>
         </FormControl>
       </VStack>
 

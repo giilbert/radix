@@ -19,7 +19,7 @@ use axum::{Extension, Router, Server};
 
 use crate::{
     mongo::Db,
-    routers::{auth::auth_routes, rooms::room_routes},
+    routers::{auth::auth_routes, problems::problem_routes, rooms::room_routes},
 };
 
 #[derive(Default)]
@@ -37,8 +37,24 @@ async fn main() -> anyhow::Result<()> {
     let db = Db::connect().await?;
     let app_state = AppState::default();
 
-    let cors_layer = CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST, Method::DELETE])
+    let app = Router::<AppState>::new()
+        .nest("/auth", auth_routes())
+        .nest("/room", room_routes())
+        .nest("/problem", problem_routes())
+        .layer(Extension(db))
+        .layer(create_cors_layer()?)
+        .with_state(app_state);
+
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3001));
+    log::info!("Listening on {}", addr);
+    Server::bind(&addr).serve(app.into_make_service()).await?;
+
+    Ok(())
+}
+
+fn create_cors_layer() -> anyhow::Result<CorsLayer> {
+    Ok(CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_headers([
             header::AUTHORIZATION,
             header::CONTENT_TYPE,
@@ -49,18 +65,5 @@ async fn main() -> anyhow::Result<()> {
             "https://radix.gilbertz.works".parse()?,
             "http://localhost:3000".parse()?,
             "http://127.0.0.1:3000".parse()?,
-        ]);
-
-    let app = Router::<AppState>::new()
-        .nest("/auth", auth_routes())
-        .nest("/room", room_routes())
-        .layer(Extension(db))
-        .layer(cors_layer)
-        .with_state(app_state);
-
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3001));
-    log::info!("Listening on {}", addr);
-    Server::bind(&addr).serve(app.into_make_service()).await?;
-
-    Ok(())
+        ]))
 }

@@ -105,7 +105,7 @@ const Home: NextPage = () => {
                 transition="transform 100ms ease-in-out, background 300ms"
                 _hover={{
                   cursor: "pointer",
-                  transform: "scale(102%)",
+                  transform: "scale(101%)",
                   bg: "whiteAlpha.200",
                 }}
               >

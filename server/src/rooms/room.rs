@@ -9,7 +9,7 @@ use tokio::{
 
 use crate::{
     models::{
-        problem::{Code, Problem, ProblemPublic, TestCase},
+        problem::{Code, Problem, PublicProblem, TestCase},
         user::{PublicUser, User},
     },
     rooms::judge,
@@ -63,7 +63,7 @@ pub enum ServerSentCommand {
         public: bool,
         owner: PublicUser,
     },
-    SetProblems(Option<Vec<ProblemPublic>>),
+    SetProblems(Option<Vec<PublicProblem>>),
     SetTestResponse(TestResponse),
 }
 
@@ -135,10 +135,10 @@ pub enum ChatMessage {
     Bad,
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
-pub struct ConnId(pub String);
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
-pub struct UserId(pub String);
+#[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
+pub struct ConnId(pub ObjectId);
+#[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
+pub struct UserId(pub ObjectId);
 
 const CHAT_MAX_MESSAGES: usize = 250;
 
@@ -178,6 +178,11 @@ impl Room {
                 Problem {
                     id: ObjectId::new(),
                     title: "Is Even".to_string(),
+                    author: PublicUser {
+                        id: ObjectId::new(),
+                        name: "Gilbert".into(),
+                        image: "https://example.com".into(),
+                    },
                     description: "Return if the number is even".to_string(),
                     boilerplate_code: Code {
                         javascript: "function solve(n) {\n  \n}\n".into(),
@@ -209,6 +214,11 @@ impl Room {
                 Problem {
                     id: ObjectId::new(),
                     title: "Is Prime".to_string(),
+                    author: PublicUser {
+                        id: ObjectId::new(),
+                        name: "Gilbert".into(),
+                        image: "https://example.com".into(),
+                    },
                     description: "Return if the number is prime".to_string(),
                     boilerplate_code: Code {
                         javascript: "function solve(n) {\n  \n}\n".into(),
@@ -325,7 +335,7 @@ impl Room {
 
                 log::info!("Room {}: connection {} added", self.config.name, id.0);
 
-                let user_id = UserId(user.id.to_string());
+                let user_id = UserId(user.id);
                 self.connections
                     .insert(id.clone(), (commands, user_id.clone()));
 
@@ -343,7 +353,7 @@ impl Room {
                         name: self.config.name.clone(),
                         public: self.config.public,
                         owner: PublicUser {
-                            id: self.config.owner.id.to_string(),
+                            id: self.config.owner.id,
                             name: self.config.owner.name.clone(),
                             image: self.config.owner.image.clone(),
                         },
@@ -356,7 +366,7 @@ impl Room {
                     self.users
                         .iter()
                         .map(|(_, (_, user))| PublicUser {
-                            id: user.id.to_string(),
+                            id: user.id,
                             name: user.name.to_string(),
                             image: user.image.clone(),
                         })
@@ -372,9 +382,10 @@ impl Room {
                     self.send_all_command(&ServerSentCommand::SetProblems(Some(
                         self.problems
                             .iter()
-                            .map(|prob| ProblemPublic {
-                                id: prob.id.to_string(),
+                            .map(|prob| PublicProblem {
+                                id: prob.id.clone(),
                                 description: prob.description.clone(),
+                                author: prob.author.clone(),
                                 title: prob.title.clone(),
                                 boilerplate_code: prob.boilerplate_code.clone(),
                                 default_test_cases: prob.test_cases[0..2].to_vec(),
@@ -410,7 +421,7 @@ impl Room {
                     self.users
                         .iter()
                         .map(|(_, (_, user))| PublicUser {
-                            id: user.id.to_string(),
+                            id: user.id,
                             name: user.name.to_string(),
                             image: user.image.clone(),
                         })
@@ -455,8 +466,9 @@ impl Room {
                         self.send_all_command(&ServerSentCommand::SetProblems(Some(
                             self.problems
                                 .iter()
-                                .map(|prob| ProblemPublic {
-                                    id: prob.id.to_string(),
+                                .map(|prob| PublicProblem {
+                                    id: prob.id.clone(),
+                                    author: prob.author.clone(),
                                     description: prob.description.clone(),
                                     title: prob.title.clone(),
                                     boilerplate_code: prob.boilerplate_code.clone(),
@@ -513,7 +525,7 @@ impl Room {
                             return Ok(false);
                         }
 
-                        let user_id = UserId(user.id.to_string());
+                        let user_id = UserId(user.id);
                         let username = user.name.clone();
                         self.send_chat_message(ChatMessage::UserSubmitted {
                             username: username.clone(),

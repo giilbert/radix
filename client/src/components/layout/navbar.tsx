@@ -13,14 +13,7 @@ export const Navbar: React.FC = () => {
   const { data: session, status } = useSession();
 
   return (
-    <Center
-      position="fixed"
-      top="0"
-      left="0"
-      w="100vw"
-      h="14"
-      bg="whiteAlpha.50"
-    >
+    <Center position="fixed" top="0" left="0" w="100vw" h="14" bg="#232934">
       <HStack w="6xl" mx="4">
         <Heading fontSize="lg">Radix</Heading>
         <Heading fontWeight="normal" fontSize="sm">

@@ -3,7 +3,7 @@ use futures_util::{
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
 };
-use mongodb::bson::Uuid;
+use mongodb::bson::{oid::ObjectId, Uuid};
 use tokio::{
     select,
     sync::mpsc::{self, Receiver, Sender},
@@ -37,7 +37,7 @@ impl Connection {
     ) -> Result<Self, SplitSink<WebSocket, Message>> {
         let (ws_tx, ws_rx) = ws.split();
         let (commands, commands_rx) = mpsc::channel::<ConnectionCommands>(100);
-        let id = ConnId(Uuid::new().to_string());
+        let id = ConnId(ObjectId::new());
 
         match room_commands
             .send(RoomCommands::AddConnection(

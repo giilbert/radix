@@ -9,7 +9,7 @@ export const Layout: React.FC<
 > = ({ title, children }) => (
   <>
     <Head>
-      <title>{title}</title>
+      <title>{title + " | Radix"}</title>
     </Head>
 
     <Navbar />
