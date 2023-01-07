@@ -136,7 +136,12 @@ impl ProblemRepo {
             .convert(Some("Error fetching problem."))
     }
 
-    pub async fn update(&self, id: &ObjectId, data: &UpdateProblem) -> Result<(), RouteErr> {
+    pub async fn update(
+        &self,
+        id: &ObjectId,
+        user_id: &ObjectId,
+        data: &UpdateProblem,
+    ) -> Result<(), RouteErr> {
         let test_cases = data
             .test_cases
             .iter()
@@ -148,11 +153,15 @@ impl ProblemRepo {
             })
             .collect::<Vec<_>>();
 
-        self.0
+        let res = self
+            .0
             .collection::<Problem>("problems")
             .update_one(
                 doc! {
                     "_id": id,
+                    "author": {
+                        "id": user_id
+                    }
                 },
                 doc! {
                     "$set": {
@@ -169,6 +178,13 @@ impl ProblemRepo {
             )
             .await
             .convert(Some("Error updating problem."))?;
+
+        if res.matched_count == 0 {
+            return Err(RouteErr::Msg(
+                StatusCode::UNAUTHORIZED,
+                "Unauthorized update of problem.".into(),
+            ));
+        }
 
         Ok(())
     }

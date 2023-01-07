@@ -61,7 +61,7 @@ async fn update_problem(
 ) -> Result<(), RouteErr> {
     let problem_id = ObjectId::parse_str(problem_id)
         .map_err(|_| RouteErr::Msg(StatusCode::BAD_REQUEST, "Invalid id.".into()))?;
-    problem_repo.update(&problem_id, &data).await?;
+    problem_repo.update(&problem_id, &user.id, &data).await?;
     Ok(())
 }
 
