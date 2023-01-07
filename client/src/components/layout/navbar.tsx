@@ -1,24 +1,39 @@
-import {
-  Box,
-  Button,
-  Center,
-  Flex,
-  Heading,
-  HStack,
-  Text,
-} from "@chakra-ui/react";
+import { Button, Center, Heading, HStack, Text } from "@chakra-ui/react";
 import { signIn, signOut, useSession } from "next-auth/react";
+import Link from "next/link";
 
-export const Navbar: React.FC = () => {
+export const Navbar: React.FC<{ selectedPage?: "rooms" | "problems" }> = ({
+  selectedPage,
+}) => {
   const { data: session, status } = useSession();
 
   return (
     <Center position="fixed" top="0" left="0" w="100vw" h="14" bg="#232934">
-      <HStack w="6xl" mx="4">
-        <Heading fontSize="lg">Radix</Heading>
-        <Heading fontWeight="normal" fontSize="sm">
-          a binarysearch clone
+      <HStack w="6xl" mx="4" gap="1">
+        <Heading fontSize="xl" mr="4">
+          Radix
         </Heading>
+
+        <Link href="/">
+          <Text
+            fontWeight={selectedPage === "rooms" ? "extrabold" : "normal"}
+            _hover={{
+              textDecoration: "underline",
+            }}
+          >
+            Rooms
+          </Text>
+        </Link>
+        <Link href="/problems">
+          <Text
+            fontWeight={selectedPage === "problems" ? "extrabold" : "normal"}
+            _hover={{
+              textDecoration: "underline",
+            }}
+          >
+            Problems
+          </Text>
+        </Link>
 
         {status !== "loading" && (
           <HStack ml="auto !important" pr="2">

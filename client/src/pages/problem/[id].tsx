@@ -22,7 +22,7 @@ const ProblemPage: NextPage = () => {
   );
 
   return (
-    <Layout title="Problem">
+    <Layout title="Problem" selectedPage="problems">
       <Button leftIcon={<FiArrowLeft />} onClick={router.back} mr="2">
         Back
       </Button>

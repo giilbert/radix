@@ -19,7 +19,6 @@ import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import { NextPage } from "next";
 import Link from "next/link";
-import router from "next/router";
 import { FiPlus } from "react-icons/fi";
 
 const ProblemsPage: NextPage = () => {
@@ -50,7 +49,7 @@ const ProblemsPage: NextPage = () => {
   );
 
   return (
-    <Layout title="Problems">
+    <Layout title="Problems" selectedPage="problems">
       <HStack w="full">
         <Heading>Problems</Heading>
 

@@ -43,7 +43,7 @@ const Home: NextPage = () => {
   const { status } = useSession();
 
   return (
-    <Layout title="Radix">
+    <Layout title="Radix" selectedPage="rooms">
       <HStack>
         <Heading>Rooms</Heading>
         {status === "authenticated" && (
