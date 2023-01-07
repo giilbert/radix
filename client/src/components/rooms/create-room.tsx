@@ -27,6 +27,9 @@ type FormData = z.infer<typeof formSchema>;
 export const CreateRoom: React.FC = () => {
   const form = useZodForm({
     schema: formSchema,
+    defaultValues: {
+      public: true,
+    },
   });
   const errors = form.formState.errors;
   const createRoom = useMutation<unknown, AxiosError, FormData>(
