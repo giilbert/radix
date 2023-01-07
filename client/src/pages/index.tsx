@@ -85,6 +85,11 @@ const Home: NextPage = () => {
           <AxiosErrorMessage error={roomsQuery.error} />
         </Box>
       )}
+      {roomsQuery.data?.length === 0 && (
+        <Text fontSize="xl" color="whiteAlpha.600" mt="4">
+          There are no rooms right now. Create a room!
+        </Text>
+      )}
       {roomsQuery.status === "success" && (
         <VStack mt="4">
           {roomsQuery.data.map(({ name, owner }) => (

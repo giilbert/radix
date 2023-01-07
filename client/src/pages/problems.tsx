@@ -119,7 +119,7 @@ const ProblemsPage: NextPage = () => {
             ))}
           </SimpleGrid>
 
-          <Text my="8" textAlign="center">
+          <Text my="8" textAlign="center" color="whiteAlpha.500" fontSize="xl">
             {problemsQuery.hasNextPage
               ? "Loading more.."
               : "You reached the end"}
