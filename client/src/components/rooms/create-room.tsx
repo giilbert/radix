@@ -17,6 +17,7 @@ import { z } from "zod";
 import { AxiosErrorMessage } from "../ui/axios-error-message";
 
 const SPECIAL_CHARACTERS_REGEX = /[^a-zA-Z0-9_-]/g;
+
 const formSchema = z.object({
   name: z.string(),
   public: z.boolean(),

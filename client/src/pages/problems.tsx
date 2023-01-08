@@ -1,5 +1,5 @@
 import { Layout } from "@/components/layout/layout";
-import { debounce, throttle } from "throttle-debounce";
+import { debounce } from "throttle-debounce";
 import { AxiosErrorMessage } from "@/components/ui/axios-error-message";
 import { OnBottom } from "@/components/ui/on-bottom";
 import { ListingProblem } from "@/types/problem";
@@ -7,19 +7,17 @@ import { axios } from "@/utils/axios";
 import {
   Box,
   Button,
-  Flex,
-  GridItem,
   Heading,
   HStack,
   SimpleGrid,
   Text,
-  VStack,
 } from "@chakra-ui/react";
-import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import { NextPage } from "next";
 import Link from "next/link";
 import { FiPlus } from "react-icons/fi";
+import { DifficultyTag } from "@/components/problems/difficulty-tag";
 
 const ProblemsPage: NextPage = () => {
   const problemsQuery = useInfiniteQuery<ListingProblem[], AxiosError>(
@@ -111,7 +109,14 @@ const ProblemsPage: NextPage = () => {
                     bg: "whiteAlpha.200",
                   }}
                 >
-                  <Heading fontSize="xl">{problem.title}</Heading>
+                  <HStack mb="2" alignItems="flex-end">
+                    <Heading fontSize="xl">{problem.title}</Heading>
+
+                    <Text>by {problem.author.name}</Text>
+                  </HStack>
+
+                  <DifficultyTag difficulty={problem.difficulty} />
+
                   <hr />
                   <Text>{problem.description}</Text>
                 </Box>

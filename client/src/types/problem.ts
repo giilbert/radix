@@ -7,6 +7,7 @@ export interface Problem {
   description: string;
   boilerplateCode: BoilerplateCode;
   defaultTestCases: TestCase[];
+  difficulty: number;
 }
 
 export interface TestCase {
@@ -23,4 +24,6 @@ export interface ListingProblem {
   id: string;
   title: string;
   description: string;
+  difficulty: number;
+  author: PublicUser;
 }

@@ -31,6 +31,7 @@ pub struct Problem {
     pub description: String,
     pub boilerplate_code: Code,
     pub test_cases: Vec<TestCase>,
+    pub difficulty: u8,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -43,6 +44,7 @@ pub struct PublicProblem {
     pub description: String,
     pub boilerplate_code: Code,
     pub default_test_cases: Vec<TestCase>,
+    pub difficulty: u8,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -53,6 +55,7 @@ pub struct ListingProblem {
     pub title: String,
     pub author: PublicUser,
     pub description: String,
+    pub difficulty: u8,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -69,6 +72,7 @@ pub struct UpdateProblem {
     pub description: String,
     pub test_cases: Vec<TestCase>,
     pub boilerplate_code: Code,
+    pub difficulty: i32,
 }
 
 #[derive(Clone)]
@@ -115,6 +119,7 @@ impl ProblemRepo {
                     "boilerplateCode": to_document(&Code {
                         ..Default::default()
                     }).unwrap(),
+                    "difficulty": 0,
                 },
                 None,
             )
@@ -138,7 +143,7 @@ impl ProblemRepo {
 
     pub async fn update(
         &self,
-        id: &ObjectId,
+        problem_id: &ObjectId,
         user_id: &ObjectId,
         data: &UpdateProblem,
     ) -> Result<(), RouteErr> {
@@ -158,13 +163,12 @@ impl ProblemRepo {
             .collection::<Problem>("problems")
             .update_one(
                 doc! {
-                    "_id": id,
-                    "author": {
-                        "id": user_id
-                    }
+                    "_id": problem_id,
+                    "author.id": user_id.to_string()
                 },
                 doc! {
                     "$set": {
+                        "difficulty": &data.difficulty,
                         "title": &data.title,
                         "description": &data.description,
                         "boilerplateCode": {

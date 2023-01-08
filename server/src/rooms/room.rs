@@ -174,118 +174,7 @@ impl Room {
             editor_contents: Default::default(),
             problem_completion: Default::default(),
             users_who_finished: 0,
-            problems: vec![
-                Problem {
-                    id: ObjectId::new(),
-                    title: "Is Even".to_string(),
-                    author: PublicUser {
-                        id: ObjectId::new(),
-                        name: "Gilbert".into(),
-                        image: "https://example.com".into(),
-                    },
-                    description: "Return if the number is even".to_string(),
-                    boilerplate_code: Code {
-                        javascript: "function solve(n) {\n  \n}\n".into(),
-                        python: "def solve(n):\n  pass\n".into(),
-                    },
-                    test_cases: vec![
-                        TestCase {
-                            input: r#"[3]"#.into(),
-                            output: "false".into(),
-                        },
-                        TestCase {
-                            input: r#"[1]"#.into(),
-                            output: "false".into(),
-                        },
-                        TestCase {
-                            input: r#"[4]"#.into(),
-                            output: "true".into(),
-                        },
-                        TestCase {
-                            input: r#"[4913]"#.into(),
-                            output: "false".into(),
-                        },
-                        TestCase {
-                            input: r#"[3192]"#.into(),
-                            output: "true".into(),
-                        },
-                    ],
-                },
-                Problem {
-                    id: ObjectId::new(),
-                    title: "Is Prime".to_string(),
-                    author: PublicUser {
-                        id: ObjectId::new(),
-                        name: "Gilbert".into(),
-                        image: "https://example.com".into(),
-                    },
-                    description: "Return if the number is prime".to_string(),
-                    boilerplate_code: Code {
-                        javascript: "function solve(n) {\n  \n}\n".into(),
-                        python: "def solve(n):\n  pass\n".into(),
-                    },
-                    test_cases: vec![
-                        TestCase {
-                            input: r#"[3]"#.into(),
-                            output: "true".into(),
-                        },
-                        TestCase {
-                            input: r#"[1]"#.into(),
-                            output: "true".into(),
-                        },
-                        TestCase {
-                            input: r#"[4]"#.into(),
-                            output: "false".into(),
-                        },
-                        TestCase {
-                            input: r#"[4913]"#.into(),
-                            output: "false".into(),
-                        },
-                        TestCase {
-                            input: r#"[3192]"#.into(),
-                            output: "false".into(),
-                        },
-                    ],
-                },
-                // Problem {
-                //     id: ObjectId::new(),
-                //     title: "Two Sum".into(),
-                //     description: "You know what this means".into(),
-                //     boilerplate_code: Code {
-                //         javascript: "function solve(nums, target) {\n  \n}\n".into(),
-                //         python: "def solve(nums, target):\n  pass\n".into(),
-                //     },
-                //     test_cases: vec![
-                //         TestCase {
-                //             input: r#"[[2, 7, 11, 15], 9]"#.into(),
-                //             output: "[0, 1]".into(),
-                //         },
-                //         TestCase {
-                //             input: r#"[[3, 2, 4], 6]"#.into(),
-                //             output: "[1, 2]".into(),
-                //         },
-                //     ],
-                // },
-                // Problem {
-                //     id: ObjectId::new(),
-                //     title: "Roman to Integer".into(),
-                //     description: "Convert roman numerals to integers".into(),
-                //     boilerplate_code: Code {
-                //         javascript: "function solve(romanNumeral) {\n  \n}\n".into(),
-                //         python: "def solve(roman_numeral):\n  pass\n".into(),
-                //     },
-                //     test_cases: vec![
-                //         TestCase {
-                //             input: r#""MCMXCIV""#.into(),
-                //             output: "1994".into(),
-                //         },
-                //         TestCase {
-                //             input: r#"LVIII"#.into(),
-                //             output: "58".into(),
-                //         },
-                //     ],
-                // },
-            ],
+            problems: vec![],
             round_in_progress: false,
             id,
         }
@@ -383,6 +272,7 @@ impl Room {
                         self.problems
                             .iter()
                             .map(|prob| PublicProblem {
+                                difficulty: prob.difficulty,
                                 id: prob.id.clone(),
                                 description: prob.description.clone(),
                                 author: prob.author.clone(),
@@ -467,6 +357,7 @@ impl Room {
                             self.problems
                                 .iter()
                                 .map(|prob| PublicProblem {
+                                    difficulty: prob.difficulty,
                                     id: prob.id.clone(),
                                     author: prob.author.clone(),
                                     description: prob.description.clone(),

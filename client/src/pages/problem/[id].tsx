@@ -45,7 +45,9 @@ const ProblemPage: NextPage = () => {
               setIsEditing={setIsEditing}
             />
           ) : (
-            <ProblemView problem={problemQuery.data} />
+            <Box mt="2">
+              <ProblemView problem={problemQuery.data} />
+            </Box>
           )}
         </>
       )}

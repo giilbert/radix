@@ -13,10 +13,10 @@ import {
   Input,
   Text,
   Textarea,
-  VStack,
 } from "@chakra-ui/react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AxiosError } from "axios";
+import { useRouter } from "next/router";
 import { useCallback } from "react";
 import { FiPlus } from "react-icons/fi";
 import { z } from "zod";
@@ -34,6 +34,7 @@ const formSchema = z.object({
     python: z.string(),
     javascript: z.string(),
   }),
+  difficulty: z.number().min(0).max(10),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -52,13 +53,25 @@ export const ProblemEditor: React.FC<{
       await axios.put(`/problem/${problem.id}`, data);
     }
   );
+  const queryClient = useQueryClient();
+  const router = useRouter();
   const onSubmit = useCallback(
     async (values: FormData) => {
-      await updateProblem.mutateAsync(values).catch(() => 0);
-      setIsEditing(false);
+      await updateProblem
+        .mutateAsync(values)
+        .then(async () => {
+          await queryClient.invalidateQueries([
+            `problem/${router.query.id as string}`,
+          ]);
+
+          setIsEditing(false);
+        })
+
+        .catch(() => 0);
     },
-    [updateProblem]
+    [updateProblem, setIsEditing, queryClient, router]
   );
+
   const errors = form.formState.errors;
 
   return (
@@ -86,6 +99,15 @@ export const ProblemEditor: React.FC<{
               height="48"
             />
             <FormErrorMessage>{errors.description?.message}</FormErrorMessage>
+          </FormControl>
+
+          <FormControl isRequired isInvalid={!!errors.difficulty}>
+            <FormLabel>Difficulty</FormLabel>
+            <Input
+              {...form.register("difficulty", { valueAsNumber: true })}
+              type="number"
+            />
+            <FormErrorMessage>{errors.difficulty?.message}</FormErrorMessage>
           </FormControl>
 
           <hr />
