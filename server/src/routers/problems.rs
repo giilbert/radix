@@ -22,6 +22,7 @@ pub fn problem_routes() -> Router<AppState> {
         .route("/:id", get(get_by_id))
         .route("/:id", put(update_problem))
         .route("/infinite", get(get_infinite))
+        .route("/search", get(search))
 }
 
 #[derive(Deserialize)]
@@ -86,4 +87,17 @@ async fn get_by_id(
         StatusCode::NOT_FOUND,
         "Problem not found.".into(),
     ))
+}
+
+#[derive(Deserialize)]
+struct Search {
+    query: String,
+}
+
+async fn search(
+    problem_repo: ProblemRepo,
+    Query(query): Query<Search>,
+) -> Result<Json<Vec<ListingProblem>>, RouteErr> {
+    let problems = problem_repo.search(&query.query).await?;
+    Ok(Json(problems))
 }

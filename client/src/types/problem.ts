@@ -1,3 +1,5 @@
+import { Enum } from "@/utils/enum";
+import { z } from "zod";
 import { PublicUser } from "./user";
 
 export interface Problem {
@@ -27,3 +29,25 @@ export interface ListingProblem {
   difficulty: number;
   author: PublicUser;
 }
+
+export const listingProblemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  difficulty: z.number(),
+  author: z.object({
+    name: z.string(),
+    id: z.string(),
+  }),
+});
+
+export type ProblemFilter = Enum<{
+  Category: {
+    questions: number;
+    difficulty: number | -1;
+    tags: string[];
+  };
+  Single: {
+    id: string;
+  };
+}>;

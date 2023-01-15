@@ -59,7 +59,7 @@ const Home: NextPage = () => {
         )}
       </HStack>
 
-      <Modal {...modalDisclosure} size="lg">
+      <Modal {...modalDisclosure} size="2xl">
         <ModalOverlay />
 
         <ModalContent>

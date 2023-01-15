@@ -192,6 +192,29 @@ impl ProblemRepo {
 
         Ok(())
     }
+
+    pub async fn search(&self, what: &String) -> Result<Vec<ListingProblem>, RouteErr> {
+        let cursor = self
+            .0
+            .collection::<ListingProblem>("problems")
+            .find(
+                doc! {
+                    "$text": {
+                        "$search": what
+                    }
+                },
+                Some(FindOptions::builder().limit(10).build()),
+            )
+            .await
+            .convert(Some("Error fetching problems."))?;
+
+        let problems = cursor
+            .try_collect::<Vec<_>>()
+            .await
+            .convert(Some("Error fetching problems."))?;
+
+        Ok(problems)
+    }
 }
 
 #[async_trait]
