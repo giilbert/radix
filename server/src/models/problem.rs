@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     errors::{ConvertResult, RouteErr},
     mongo::{oid_as_string, Db},
+    routers::rooms::ProblemsFilter,
 };
 
 use super::user::PublicUser;
@@ -204,6 +205,45 @@ impl ProblemRepo {
                     }
                 },
                 Some(FindOptions::builder().limit(10).build()),
+            )
+            .await
+            .convert(Some("Error fetching problems."))?;
+
+        let problems = cursor
+            .try_collect::<Vec<_>>()
+            .await
+            .convert(Some("Error fetching problems."))?;
+
+        Ok(problems)
+    }
+
+    pub async fn get_from_filters(
+        &self,
+        filters: &Vec<ProblemsFilter>,
+    ) -> Result<Vec<Problem>, RouteErr> {
+        let problem_id_filters = filters
+            .iter()
+            .filter(|f| match f {
+                ProblemsFilter::Single { .. } => true,
+            })
+            .map(|f| match f {
+                ProblemsFilter::Single { id } => ObjectId::parse_str(id),
+            })
+            .collect::<Result<Vec<_>, mongodb::bson::oid::Error>>()
+            .map_err(|_| RouteErr::Msg(StatusCode::BAD_REQUEST, "Invalid ObjectId".into()))?;
+
+        log::info!("{:?}", problem_id_filters);
+
+        let cursor = self
+            .0
+            .collection::<Problem>("problems")
+            .find(
+                doc! {
+                    "_id": {
+                        "$in": problem_id_filters
+                    }
+                },
+                None,
             )
             .await
             .convert(Some("Error fetching problems."))?;

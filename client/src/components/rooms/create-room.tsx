@@ -134,7 +134,7 @@ export const CreateRoom: React.FC = () => {
               <Button my="4" w="100%" onClick={() => setStage("general")}>
                 Back
               </Button>
-              <Button my="4" w="100%" onClick={form.handleSubmit(console.log)}>
+              <Button my="4" w="100%" onClick={form.handleSubmit(onSubmit)}>
                 Create Room
               </Button>
             </HStack>

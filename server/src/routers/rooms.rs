@@ -12,10 +12,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     errors::RouteErr,
-    models::user::{PublicUser, User},
+    models::{
+        problem::ProblemRepo,
+        user::{PublicUser, User},
+    },
     rooms::{
         connection::Connection,
-        room::{CreateRoom, Room, RoomConfig, ServerSentCommand},
+        room::{Room, RoomConfig, ServerSentCommand},
     },
     AppState,
 };
@@ -28,8 +31,25 @@ pub fn room_routes() -> Router<AppState, Body> {
         .route("/:name", get(connect))
 }
 
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct CreateRoom {
+    pub name: String,
+    pub public: bool,
+    pub problems: Vec<ProblemsFilter>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase", tag = "t", content = "c")]
+pub enum ProblemsFilter {
+    #[serde(rename = "Single")]
+    Single { id: String },
+    // TODO: the rest of the filters
+}
+
 async fn create_room(
     owner: User,
+    problem_repo: ProblemRepo,
     State(state): State<AppState>,
     Json(data): Json<CreateRoom>,
 ) -> Result<(), RouteErr> {
@@ -53,7 +73,12 @@ async fn create_room(
         public: data.public,
         owner,
     };
-    let room = Room::new(id, config.clone());
+
+    let problems = problem_repo.get_from_filters(&data.problems).await?;
+
+    log::info!("{:?}", problems);
+
+    let room = Room::new(id, problems, config.clone());
     state
         .write()
         .rooms

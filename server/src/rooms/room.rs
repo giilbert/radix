@@ -13,6 +13,7 @@ use crate::{
         user::{PublicUser, User},
     },
     rooms::judge,
+    routers::rooms::ProblemsFilter,
 };
 
 use super::{connection::ConnectionCommands, judge::FailedTestCase};
@@ -84,13 +85,6 @@ pub enum TestResponse {
     },
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateRoom {
-    pub name: String,
-    pub public: bool,
-}
-
 #[derive(Debug, Clone, Serialize)]
 pub struct RoomConfig {
     pub name: String,
@@ -160,7 +154,7 @@ pub struct Room {
 }
 
 impl Room {
-    pub fn new(id: Uuid, config: RoomConfig) -> Self {
+    pub fn new(id: Uuid, problems: Vec<Problem>, config: RoomConfig) -> Self {
         let (commands, commands_rx) = mpsc::channel::<RoomCommands>(200);
 
         Room {
@@ -174,7 +168,7 @@ impl Room {
             editor_contents: Default::default(),
             problem_completion: Default::default(),
             users_who_finished: 0,
-            problems: vec![],
+            problems,
             round_in_progress: false,
             id,
         }

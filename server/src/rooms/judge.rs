@@ -110,7 +110,12 @@ fn python_runner(test_cases: &[TestCase]) -> anyhow::Result<String> {
 import json
 
 __RADIX_TEST_INPUTS = json.loads("{}")
-print("[[RADIX TEST OUTPUT]]", json.dumps([solve(*input) for input in __RADIX_TEST_INPUTS], separators=(",",":")))
+output = []
+
+for input in __RADIX_TEST_INPUTS:
+    output.append(solve(*input))
+
+print("[[RADIX TEST OUTPUT]]", json.dumps(output, separators=(",",":")))
 
 """#,
         serde_json::to_string(&inputs)?.replace("\"", "\\\"")
