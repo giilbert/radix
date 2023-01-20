@@ -1,4 +1,6 @@
+use lazy_static::lazy_static;
 use piston_rs::{Client, Executor, File};
+use regex::Regex;
 use serde::Serialize;
 use serde_json::Value;
 
@@ -17,6 +19,10 @@ pub struct FailedTestCase {
 pub struct JudgingResults {
     pub failed_tests: Vec<FailedTestCase>,
     pub okay_tests: Vec<TestCase>,
+}
+
+lazy_static! {
+    static ref PISTON_SLASH_JOB: Regex = Regex::new("/piston/jobs/[a-zA-Z0-9-]+/").unwrap();
 }
 
 // TODO: language
@@ -49,7 +55,7 @@ pub async fn judge(
     if result.run.stderr != "" {
         return Err(anyhow::anyhow!(
             "Error running code:\n{}",
-            result.run.stderr
+            PISTON_SLASH_JOB.replace_all(&result.run.stderr, "")
         ));
     }
 
