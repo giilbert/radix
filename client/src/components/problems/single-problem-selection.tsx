@@ -102,7 +102,6 @@ export const SingleProblemSelection: React.FC<{ index: number }> = ({
             </HStack>
 
             <DifficultyTag difficulty={selectedProblem.difficulty} />
-            <Text>{selectedProblem.description}</Text>
           </Box>
 
           <IconButton
@@ -176,7 +175,7 @@ export const SingleProblemSelection: React.FC<{ index: number }> = ({
                     cursor: "pointer",
                   }}
                   px="2"
-                  py="1"
+                  py="2"
                   borderRadius="md"
                   onClick={() => {
                     setQuery("");
@@ -195,7 +194,6 @@ export const SingleProblemSelection: React.FC<{ index: number }> = ({
                   </HStack>
 
                   <DifficultyTag difficulty={problem.difficulty} />
-                  <Text>{problem.description}</Text>
                 </Box>
                 <hr />
               </Fragment>

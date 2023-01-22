@@ -3,6 +3,7 @@ use piston_rs::{Client, Executor, File};
 use regex::Regex;
 use serde::Serialize;
 use serde_json::Value;
+use tokio::sync::mpsc;
 
 use crate::models::problem::TestCase;
 
@@ -31,7 +32,7 @@ pub async fn judge(
     code: &String,
     test_cases: &[TestCase],
 ) -> anyhow::Result<JudgingResults> {
-    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    // tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     let client = if let Ok(url) = dotenvy::var("PISTON_URL") {
         Client::with_url(&url)

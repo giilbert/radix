@@ -20,6 +20,7 @@ import { useRouter } from "next/router";
 import { useCallback } from "react";
 import { FiPlus } from "react-icons/fi";
 import { z } from "zod";
+import { MarkdownEditor } from "../ui/markdown-editor";
 
 const formSchema = z.object({
   title: z.string(),
@@ -93,10 +94,11 @@ export const ProblemEditor: React.FC<{
 
           <FormControl isRequired isInvalid={!!errors.description}>
             <FormLabel>Description</FormLabel>
-            <Textarea
+            <MarkdownEditor
               {...form.register("description")}
+              defaultValue={form.getValues().description}
               resize="none"
-              height="48"
+              height="32rem"
             />
             <FormErrorMessage>{errors.description?.message}</FormErrorMessage>
           </FormControl>

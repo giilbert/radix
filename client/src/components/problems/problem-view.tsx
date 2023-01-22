@@ -1,5 +1,6 @@
 import { Problem } from "@/types/problem";
 import { Heading, Tag, Text } from "@chakra-ui/react";
+import { MarkdownRender } from "../ui/markdown-render";
 import { DifficultyTag } from "./difficulty-tag";
 
 export const ProblemView: React.FC<{ problem: Problem }> = ({ problem }) => {
@@ -10,7 +11,7 @@ export const ProblemView: React.FC<{ problem: Problem }> = ({ problem }) => {
 
       <hr />
 
-      <Text>{problem.description}</Text>
+      <MarkdownRender content={problem.description} />
     </>
   );
 };

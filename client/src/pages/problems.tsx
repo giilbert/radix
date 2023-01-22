@@ -83,7 +83,6 @@ const ProblemsPage: NextPage = () => {
               sm: "repeat(2, 1fr)",
               md: "repeat(3, 1fr)",
             }}
-            gridAutoRows="12rem"
             gap="2"
           >
             {problems.map((problem) => (
@@ -116,9 +115,6 @@ const ProblemsPage: NextPage = () => {
                   </HStack>
 
                   <DifficultyTag difficulty={problem.difficulty} />
-
-                  <hr />
-                  <Text>{problem.description}</Text>
                 </Box>
               </Link>
             ))}
