@@ -126,10 +126,9 @@ export const Editors: React.FC = () => {
 
           <Button
             w="28"
+            isLoading={testStatus.t === "Awaiting"}
             onClick={throttle(() => {
               if (!problems) return;
-
-              console.log(problems[currentProblemIndex].defaultTestCases);
 
               room.sendCommand({
                 t: "SetEditorContent",
@@ -155,6 +154,7 @@ export const Editors: React.FC = () => {
           </Button>
           <Button
             w="28"
+            isLoading={testStatus.t === "Awaiting"}
             onClick={throttle(() => {
               setTestStatus({
                 t: "Awaiting",
