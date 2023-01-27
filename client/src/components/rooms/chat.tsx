@@ -14,6 +14,7 @@ import {
 } from "@chakra-ui/react";
 import { createRef, useEffect, useRef } from "react";
 import { FiFlag, FiUpload } from "react-icons/fi";
+import { MarkdownRender } from "../ui/markdown-render";
 
 const nth = (n: number) => {
   return ["st", "nd", "rd"][((((n + 90) % 100) - 10) % 10) - 1] || "th";
@@ -148,11 +149,8 @@ export const Chat: React.FC = () => {
                   >
                     {v.c.author.name}
                   </Text>
-                  {v.c.content.split("\n").map((line, i) => (
-                    <Text color="gray.300" key={i} wordBreak="break-all">
-                      {line || " "}
-                    </Text>
-                  ))}
+
+                  <MarkdownRender content={v.c.content} />
                 </Box>
               </HStack>
             )}
