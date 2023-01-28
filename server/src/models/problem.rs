@@ -57,6 +57,7 @@ pub struct ListingProblem {
     pub author: PublicUser,
     pub description: String,
     pub difficulty: u8,
+    pub draft: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -86,13 +87,14 @@ impl ProblemRepo {
     ) -> Result<Vec<ListingProblem>, RouteErr> {
         let cursor = self
             .0
-            .collection::<ListingProblem>("problems")
+            .collection::<Problem>("problems")
             .find(
                 cursor.map(|id| {
                     doc! {
                         "_id": {
                             "$gt": id
-                        }
+                        },
+                        "testCases.4": { "$exists": true }
                     }
                 }),
                 Some(FindOptions::builder().limit(10).build()),
@@ -105,7 +107,17 @@ impl ProblemRepo {
             .await
             .convert(Some("Error fetching problems."))?;
 
-        Ok(problems)
+        Ok(problems
+            .iter()
+            .map(|p| ListingProblem {
+                id: p.id.clone(),
+                title: p.title.clone(),
+                description: p.description.clone(),
+                author: p.author.clone(),
+                difficulty: p.difficulty,
+                draft: p.test_cases.len() < 5,
+            })
+            .collect::<Vec<_>>())
     }
 
     pub async fn create_empty(&self, author: PublicUser) -> Result<ObjectId, RouteErr> {
@@ -202,7 +214,8 @@ impl ProblemRepo {
                 doc! {
                     "$text": {
                         "$search": what
-                    }
+                    },
+                    "testCases.4": { "$exists": true }
                 },
                 Some(FindOptions::builder().limit(10).build()),
             )

@@ -10,6 +10,7 @@ import {
   Heading,
   HStack,
   SimpleGrid,
+  Tag,
   Text,
 } from "@chakra-ui/react";
 import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
@@ -114,7 +115,10 @@ const ProblemsPage: NextPage = () => {
                     <Text>by {problem.author.name}</Text>
                   </HStack>
 
-                  <DifficultyTag difficulty={problem.difficulty} />
+                  <HStack>
+                    {problem.draft && <Tag colorScheme="red">DRAFT</Tag>}
+                    <DifficultyTag difficulty={problem.difficulty} />
+                  </HStack>
                 </Box>
               </Link>
             ))}

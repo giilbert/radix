@@ -28,6 +28,7 @@ export interface ListingProblem {
   description: string;
   difficulty: number;
   author: PublicUser;
+  draft: boolean;
 }
 
 export const listingProblemSchema = z.object({
