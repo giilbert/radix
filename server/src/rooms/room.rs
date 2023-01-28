@@ -9,10 +9,11 @@ use tokio::{
 
 use crate::{
     models::{
-        problem::{Code, Problem, ProblemPublic, TestCase},
+        problem::{Code, Problem, PublicProblem, TestCase},
         user::{PublicUser, User},
     },
     rooms::judge,
+    routers::rooms::ProblemsFilter,
 };
 
 use super::{connection::ConnectionCommands, judge::FailedTestCase};
@@ -63,7 +64,7 @@ pub enum ServerSentCommand {
         public: bool,
         owner: PublicUser,
     },
-    SetProblems(Option<Vec<ProblemPublic>>),
+    SetProblems(Option<Vec<PublicProblem>>),
     SetTestResponse(TestResponse),
 }
 
@@ -82,13 +83,6 @@ pub enum TestResponse {
     AllTestsPassed {
         runtime: u32,
     },
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateRoom {
-    pub name: String,
-    pub public: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -135,10 +129,10 @@ pub enum ChatMessage {
     Bad,
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
-pub struct ConnId(pub String);
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
-pub struct UserId(pub String);
+#[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
+pub struct ConnId(pub ObjectId);
+#[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
+pub struct UserId(pub ObjectId);
 
 const CHAT_MAX_MESSAGES: usize = 250;
 
@@ -160,7 +154,7 @@ pub struct Room {
 }
 
 impl Room {
-    pub fn new(id: Uuid, config: RoomConfig) -> Self {
+    pub fn new(id: Uuid, problems: Vec<Problem>, config: RoomConfig) -> Self {
         let (commands, commands_rx) = mpsc::channel::<RoomCommands>(200);
 
         Room {
@@ -174,108 +168,7 @@ impl Room {
             editor_contents: Default::default(),
             problem_completion: Default::default(),
             users_who_finished: 0,
-            problems: vec![
-                Problem {
-                    id: ObjectId::new(),
-                    title: "Is Even".to_string(),
-                    description: "Return if the number is even".to_string(),
-                    boilerplate_code: Code {
-                        javascript: "function solve(n) {\n  \n}\n".into(),
-                        python: "def solve(n):\n  pass\n".into(),
-                    },
-                    test_cases: vec![
-                        TestCase {
-                            input: r#"[3]"#.into(),
-                            output: "false".into(),
-                        },
-                        TestCase {
-                            input: r#"[1]"#.into(),
-                            output: "false".into(),
-                        },
-                        TestCase {
-                            input: r#"[4]"#.into(),
-                            output: "true".into(),
-                        },
-                        TestCase {
-                            input: r#"[4913]"#.into(),
-                            output: "false".into(),
-                        },
-                        TestCase {
-                            input: r#"[3192]"#.into(),
-                            output: "true".into(),
-                        },
-                    ],
-                },
-                Problem {
-                    id: ObjectId::new(),
-                    title: "Is Prime".to_string(),
-                    description: "Return if the number is prime".to_string(),
-                    boilerplate_code: Code {
-                        javascript: "function solve(n) {\n  \n}\n".into(),
-                        python: "def solve(n):\n  pass\n".into(),
-                    },
-                    test_cases: vec![
-                        TestCase {
-                            input: r#"[3]"#.into(),
-                            output: "true".into(),
-                        },
-                        TestCase {
-                            input: r#"[1]"#.into(),
-                            output: "true".into(),
-                        },
-                        TestCase {
-                            input: r#"[4]"#.into(),
-                            output: "false".into(),
-                        },
-                        TestCase {
-                            input: r#"[4913]"#.into(),
-                            output: "false".into(),
-                        },
-                        TestCase {
-                            input: r#"[3192]"#.into(),
-                            output: "false".into(),
-                        },
-                    ],
-                },
-                // Problem {
-                //     id: ObjectId::new(),
-                //     title: "Two Sum".into(),
-                //     description: "You know what this means".into(),
-                //     boilerplate_code: Code {
-                //         javascript: "function solve(nums, target) {\n  \n}\n".into(),
-                //         python: "def solve(nums, target):\n  pass\n".into(),
-                //     },
-                //     test_cases: vec![
-                //         TestCase {
-                //             input: r#"[[2, 7, 11, 15], 9]"#.into(),
-                //             output: "[0, 1]".into(),
-                //         },
-                //         TestCase {
-                //             input: r#"[[3, 2, 4], 6]"#.into(),
-                //             output: "[1, 2]".into(),
-                //         },
-                //     ],
-                // },
-                // Problem {
-                //     id: ObjectId::new(),
-                //     title: "Roman to Integer".into(),
-                //     description: "Convert roman numerals to integers".into(),
-                //     boilerplate_code: Code {
-                //         javascript: "function solve(romanNumeral) {\n  \n}\n".into(),
-                //         python: "def solve(roman_numeral):\n  pass\n".into(),
-                //     },
-                //     test_cases: vec![
-                //         TestCase {
-                //             input: r#""MCMXCIV""#.into(),
-                //             output: "1994".into(),
-                //         },
-                //         TestCase {
-                //             input: r#"LVIII"#.into(),
-                //             output: "58".into(),
-                //         },
-                //     ],
-                // },
-            ],
+            problems,
             round_in_progress: false,
             id,
         }
@@ -325,7 +218,7 @@ impl Room {
 
                 log::info!("Room {}: connection {} added", self.config.name, id.0);
 
-                let user_id = UserId(user.id.to_string());
+                let user_id = UserId(user.id);
                 self.connections
                     .insert(id.clone(), (commands, user_id.clone()));
 
@@ -343,7 +236,7 @@ impl Room {
                         name: self.config.name.clone(),
                         public: self.config.public,
                         owner: PublicUser {
-                            id: self.config.owner.id.to_string(),
+                            id: self.config.owner.id,
                             name: self.config.owner.name.clone(),
                             image: self.config.owner.image.clone(),
                         },
@@ -356,7 +249,7 @@ impl Room {
                     self.users
                         .iter()
                         .map(|(_, (_, user))| PublicUser {
-                            id: user.id.to_string(),
+                            id: user.id,
                             name: user.name.to_string(),
                             image: user.image.clone(),
                         })
@@ -372,9 +265,11 @@ impl Room {
                     self.send_all_command(&ServerSentCommand::SetProblems(Some(
                         self.problems
                             .iter()
-                            .map(|prob| ProblemPublic {
-                                id: prob.id.to_string(),
+                            .map(|prob| PublicProblem {
+                                difficulty: prob.difficulty,
+                                id: prob.id.clone(),
                                 description: prob.description.clone(),
+                                author: prob.author.clone(),
                                 title: prob.title.clone(),
                                 boilerplate_code: prob.boilerplate_code.clone(),
                                 default_test_cases: prob.test_cases[0..2].to_vec(),
@@ -410,7 +305,7 @@ impl Room {
                     self.users
                         .iter()
                         .map(|(_, (_, user))| PublicUser {
-                            id: user.id.to_string(),
+                            id: user.id,
                             name: user.name.to_string(),
                             image: user.image.clone(),
                         })
@@ -455,8 +350,10 @@ impl Room {
                         self.send_all_command(&ServerSentCommand::SetProblems(Some(
                             self.problems
                                 .iter()
-                                .map(|prob| ProblemPublic {
-                                    id: prob.id.to_string(),
+                                .map(|prob| PublicProblem {
+                                    difficulty: prob.difficulty,
+                                    id: prob.id.clone(),
+                                    author: prob.author.clone(),
                                     description: prob.description.clone(),
                                     title: prob.title.clone(),
                                     boilerplate_code: prob.boilerplate_code.clone(),
@@ -513,7 +410,7 @@ impl Room {
                             return Ok(false);
                         }
 
-                        let user_id = UserId(user.id.to_string());
+                        let user_id = UserId(user.id);
                         let username = user.name.clone();
                         self.send_chat_message(ChatMessage::UserSubmitted {
                             username: username.clone(),
@@ -546,7 +443,9 @@ impl Room {
                                     self.send_connection(
                                         &conn_id,
                                         &ServerSentCommand::SetTestResponse(
-                                            TestResponse::AllTestsPassed { runtime: 328921920 },
+                                            TestResponse::AllTestsPassed {
+                                                runtime: results.runtime,
+                                            },
                                         ),
                                     )
                                     .await?;

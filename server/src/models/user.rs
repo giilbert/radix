@@ -28,7 +28,8 @@ pub struct User {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PublicUser {
-    pub id: String,
+    #[serde(serialize_with = "oid_as_string")]
+    pub id: ObjectId,
     pub name: String,
     pub image: String,
 }
@@ -267,7 +268,7 @@ where
 impl User {
     pub fn to_public(&self) -> PublicUser {
         PublicUser {
-            id: self.id.to_string(),
+            id: self.id,
             name: self.name.clone(),
             image: self.image.clone(),
         }

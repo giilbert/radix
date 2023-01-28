@@ -23,7 +23,7 @@ export const Editors: React.FC = () => {
   const { data: session } = useSession();
   const room = useRoom();
   const {
-    users,
+    users: usersUnsorted,
     problems,
     code,
     currentProblemIndex,
@@ -34,8 +34,17 @@ export const Editors: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState<
     "python" | "javascript"
   >("python");
+  const [currentTab, setCurrentTab] = useState(0);
 
   const isResultsActive = testStatus.t !== "None";
+
+  const currentUserIndex = usersUnsorted.findIndex(
+    (user) => user.id === session?.user.id
+  );
+  const users = [...usersUnsorted];
+  users.splice(currentUserIndex, 1);
+  if (usersUnsorted[currentUserIndex])
+    users.unshift(usersUnsorted[currentUserIndex]);
 
   if (users.length === 0) return <Text>Loading</Text>;
   if (!session) return <Text>Loading</Text>;
@@ -45,10 +54,16 @@ export const Editors: React.FC = () => {
       <Tabs
         h="100%"
         defaultIndex={users.findIndex((user) => user.id === session.user.id)}
+        index={currentTab}
+        onChange={(e) => {
+          setCurrentTab(e);
+        }}
       >
         <TabList h="3rem">
           {users.map((user) => (
-            <Tab key={user.id}>{user.name}</Tab>
+            <Tab key={user.id}>
+              {user.id === session.user.id ? "You" : user.name}
+            </Tab>
           ))}
         </TabList>
 
@@ -57,7 +72,9 @@ export const Editors: React.FC = () => {
             return (
               <TabPanel p="0" h="100%" key={user.id}>
                 {user.id !== session.user.id && (
-                  <Text key={user.id}>No peeking</Text>
+                  <Text key={user.id} p="4" fontSize="xl">
+                    TODO: see other people&apos;s editor
+                  </Text>
                 )}
 
                 {user.id === session.user.id && (
@@ -111,10 +128,9 @@ export const Editors: React.FC = () => {
 
           <Button
             w="28"
+            isLoading={testStatus.t === "Awaiting"}
             onClick={throttle(() => {
               if (!problems) return;
-
-              console.log(problems[currentProblemIndex].defaultTestCases);
 
               room.sendCommand({
                 t: "SetEditorContent",
@@ -140,6 +156,7 @@ export const Editors: React.FC = () => {
           </Button>
           <Button
             w="28"
+            isLoading={testStatus.t === "Awaiting"}
             onClick={throttle(() => {
               setTestStatus({
                 t: "Awaiting",

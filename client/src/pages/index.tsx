@@ -1,5 +1,6 @@
 import { Layout } from "@/components/layout/layout";
 import { CreateRoom } from "@/components/rooms/create-room";
+import { AxiosErrorMessage } from "@/components/ui/axios-error-message";
 import { axios } from "@/utils/axios";
 import {
   Box,
@@ -14,15 +15,17 @@ import {
   ModalContent,
   ModalHeader,
   ModalOverlay,
+  Skeleton,
   Text,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
+import { AxiosError } from "axios";
 import type { NextPage } from "next";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { FiChevronRight } from "react-icons/fi";
+import { FiChevronRight, FiPlus } from "react-icons/fi";
 
 const Home: NextPage = () => {
   const modalDisclosure = useDisclosure();
@@ -34,20 +37,29 @@ const Home: NextPage = () => {
         name: string;
         image: string;
       };
-    }[]
+    }[],
+    AxiosError
   >(["room/list"]);
   const { status } = useSession();
 
   return (
-    <Layout title="Radix">
+    <Layout title="Radix" selectedPage="rooms">
       <HStack>
         <Heading>Rooms</Heading>
         {status === "authenticated" && (
-          <Button onClick={modalDisclosure.onOpen}>Create</Button>
+          <Button
+            onClick={modalDisclosure.onOpen}
+            ml="auto !important"
+            px="8"
+            colorScheme="green"
+            leftIcon={<FiPlus size={20} />}
+          >
+            Create
+          </Button>
         )}
       </HStack>
 
-      <Modal {...modalDisclosure} size="lg">
+      <Modal {...modalDisclosure} size="2xl">
         <ModalOverlay />
 
         <ModalContent>
@@ -59,9 +71,27 @@ const Home: NextPage = () => {
         </ModalContent>
       </Modal>
 
-      {roomsQuery.status === "loading" && <Text>Loading..</Text>}
+      {roomsQuery.status === "loading" && (
+        <VStack mt="4">
+          {Array(5)
+            .fill(0)
+            .map((_, i) => (
+              <Skeleton key={i} w="100%" h="20" borderRadius="md" />
+            ))}
+        </VStack>
+      )}
+      {roomsQuery.status === "error" && (
+        <Box mt="4">
+          <AxiosErrorMessage error={roomsQuery.error} />
+        </Box>
+      )}
+      {roomsQuery.data?.length === 0 && (
+        <Text fontSize="xl" color="whiteAlpha.600" mt="4">
+          There are no rooms right now. Create a room!
+        </Text>
+      )}
       {roomsQuery.status === "success" && (
-        <Flex mt="4">
+        <VStack mt="4">
           {roomsQuery.data.map(({ name, owner }) => (
             <Link
               key={name}
@@ -72,15 +102,15 @@ const Home: NextPage = () => {
             >
               <HStack
                 w="100%"
+                h="20"
                 bg="whiteAlpha.100"
-                py="4"
                 px="6"
                 borderRadius="md"
                 gap="2"
                 transition="transform 100ms ease-in-out, background 300ms"
                 _hover={{
                   cursor: "pointer",
-                  transform: "scale(102%)",
+                  transform: "scale(101%)",
                   bg: "whiteAlpha.200",
                 }}
               >
@@ -96,7 +126,7 @@ const Home: NextPage = () => {
               </HStack>
             </Link>
           ))}
-        </Flex>
+        </VStack>
       )}
     </Layout>
   );

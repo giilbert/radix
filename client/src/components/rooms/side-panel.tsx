@@ -7,6 +7,7 @@ import {
   FiChevronLeft,
   FiChevronRight,
 } from "react-icons/fi";
+import { MarkdownRender } from "../ui/markdown-render";
 import { useRoom, useRoomData } from "./room-provider";
 
 export const SidePanel: React.FC = () => {
@@ -93,7 +94,7 @@ export const SidePanel: React.FC = () => {
               </Button>
             </HStack>
           </HStack>
-          <Text>{problems[currentProblemIndex].description}</Text>
+          <MarkdownRender content={problems[currentProblemIndex].description} />
         </>
       )}
     </Box>

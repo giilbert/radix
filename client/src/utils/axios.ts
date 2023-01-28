@@ -10,12 +10,13 @@ axios.interceptors.response.use(
   (res) => res,
   (err) => {
     delete (err as any).stack;
-    err.message = (
-      (err.response.data as any) || {
-        error: "Unable to reach server.",
-      }
-    ).error;
-    err.code = err.response.statusText;
+    if (err.response) {
+      err.message = (err.response.data as any).error;
+      err.code = err.response.statusText;
+    } else {
+      err.message = "Unable to reach server.";
+      err.code = "500";
+    }
     throw err;
   }
 );

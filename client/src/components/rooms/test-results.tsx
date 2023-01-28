@@ -9,10 +9,15 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { FiCheck, FiX } from "react-icons/fi";
+import ReactConfetti from "react-confetti";
 import { useRoomData } from "./room-provider";
+import { useState } from "react";
 
 export const TestResults: React.FC = () => {
   const testStatus = useRoomData((s) => s.testStatus);
+
+  const confetti =
+    testStatus.t === "Response" && testStatus.c.t === "AllTestsPassed";
 
   return (
     <Box
@@ -95,14 +100,22 @@ export const TestResults: React.FC = () => {
           resize="none"
         />
       )}
-
       {testStatus.t === "Response" && testStatus.c.t === "AllTestsPassed" && (
         <>
-          <Heading ml="2">yay</Heading>
-          <Text ml="2">all tests passed!</Text>
-          <Text ml="2">go on to the next question!!!</Text>
+          <Heading fontSize="1.4rem" mb="3">
+            All tests passed in{" "}
+            {testStatus.c.c.runtime === 0 ? "<1" : testStatus.c.c.runtime}ms!
+          </Heading>
+
+          <Text>Move on to the next question!</Text>
         </>
       )}
+
+      <ReactConfetti
+        numberOfPieces={confetti ? 500 : 0}
+        recycle={false}
+        onConfettiComplete={(confetti) => confetti?.reset()}
+      />
     </Box>
   );
 };

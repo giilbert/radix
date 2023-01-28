@@ -1,6 +1,9 @@
+use lazy_static::lazy_static;
 use piston_rs::{Client, Executor, File};
-use serde::Serialize;
+use regex::Regex;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tokio::sync::mpsc;
 
 use crate::models::problem::TestCase;
 
@@ -17,6 +20,17 @@ pub struct FailedTestCase {
 pub struct JudgingResults {
     pub failed_tests: Vec<FailedTestCase>,
     pub okay_tests: Vec<TestCase>,
+    pub runtime: u32,
+}
+
+#[derive(Deserialize, Debug)]
+struct TestOutput {
+    pub runtime: u32,
+    pub program_output: Vec<Value>,
+}
+
+lazy_static! {
+    static ref PISTON_SLASH_JOB: Regex = Regex::new("/piston/jobs/[a-zA-Z0-9-]+/").unwrap();
 }
 
 // TODO: language
@@ -25,7 +39,7 @@ pub async fn judge(
     code: &String,
     test_cases: &[TestCase],
 ) -> anyhow::Result<JudgingResults> {
-    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    // tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     let client = if let Ok(url) = dotenvy::var("PISTON_URL") {
         Client::with_url(&url)
@@ -49,11 +63,11 @@ pub async fn judge(
     if result.run.stderr != "" {
         return Err(anyhow::anyhow!(
             "Error running code:\n{}",
-            result.run.stderr
+            PISTON_SLASH_JOB.replace_all(&result.run.stderr, "")
         ));
     }
 
-    let output = serde_json::from_str::<Vec<Value>>(
+    let output = serde_json::from_str::<TestOutput>(
         result
             .run
             .stdout
@@ -68,7 +82,7 @@ pub async fn judge(
     let mut failed_tests = vec![];
     let mut okay_tests = vec![];
 
-    for (got, test_case) in output.iter().zip(test_cases) {
+    for (got, test_case) in output.program_output.iter().zip(test_cases) {
         if got.to_string()
             == serde_json::to_string(&serde_json::from_str::<Value>(&test_case.output)?)?
         {
@@ -92,9 +106,11 @@ pub async fn judge(
     Ok(JudgingResults {
         failed_tests,
         okay_tests,
+        runtime: output.runtime,
     })
 }
 
+const PYTHON_TEMPLATE: &str = include_str!("./templates/python-runner.py");
 fn python_runner(test_cases: &[TestCase]) -> anyhow::Result<String> {
     let inputs = test_cases
         .iter()
@@ -103,18 +119,7 @@ fn python_runner(test_cases: &[TestCase]) -> anyhow::Result<String> {
         .map(|p| p.unwrap())
         .collect::<Vec<Value>>();
 
-    let code = format!(
-        r#"""
-# RADIX TEST STUFF -- DO NOT TAMPER
-
-import json
-
-__RADIX_TEST_INPUTS = json.loads("{}")
-print("[[RADIX TEST OUTPUT]]", json.dumps([solve(*input) for input in __RADIX_TEST_INPUTS], separators=(",",":")))
-
-"""#,
-        serde_json::to_string(&inputs)?.replace("\"", "\\\"")
-    );
+    let code = PYTHON_TEMPLATE.replace("{{INPUTS}}", &serde_json::to_string(&inputs)?);
 
     // let expected = serde_json::to_string(
     //     &test_cases

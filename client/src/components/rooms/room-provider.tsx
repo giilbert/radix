@@ -1,3 +1,5 @@
+import { Problem, TestCase } from "@/types/problem";
+import { PublicUser } from "@/types/user";
 import { BACKEND_URL } from "@/utils/consts";
 import { Enum } from "@/utils/enum";
 import { Text } from "@chakra-ui/react";
@@ -24,7 +26,7 @@ type ChatMessage = Enum<{
     username: string;
   };
   UserChat: {
-    author: RoomUser;
+    author: PublicUser;
     content: string;
   };
   RoundBegin: null;
@@ -42,35 +44,16 @@ type ChatMessage = Enum<{
   };
 }>;
 
-type RoomUser = {
-  id: string;
-  name: string;
-  image: string;
-};
-
 type RoomConfig = {
   name: string;
   public: boolean;
-  owner: RoomUser;
-};
-
-type BoilerplateCode = {
-  python: string;
-  javascript: string;
-};
-
-type Problem = {
-  id: string;
-  title: string;
-  description: string;
-  boilerplateCode: BoilerplateCode;
-  defaultTestCases: TestCase[];
+  owner: PublicUser;
 };
 
 type ServerSentCommand = Enum<{
   ChatMessage: ChatMessage;
   ChatHistory: ChatMessage[];
-  SetUsers: RoomUser[];
+  SetUsers: PublicUser[];
   SetRoomConfig: RoomConfig;
   SetProblems: Problem[] | null;
   SetTestResponse: TestResponse;
@@ -91,11 +74,6 @@ type ClientSentCommand = Enum<{
     language: string;
   };
 }>;
-
-export type TestCase = {
-  input: string;
-  output: string;
-};
 
 type TestStatus = Enum<{
   None: null;
@@ -118,7 +96,7 @@ type TestResponse = Enum<{
 
 export const useRoomData = create<{
   chatMessages: ChatMessage[];
-  users: RoomUser[];
+  users: PublicUser[];
   roomConfig: RoomConfig | null;
   problems: Problem[] | null;
   code: Map<number, Map<string, string>>;
@@ -127,7 +105,7 @@ export const useRoomData = create<{
   setCurrentProblemIndex: (index: number) => void;
   addChatMessage: (message: ChatMessage) => void;
   setChatMessages: (messages: ChatMessage[]) => void;
-  setUsers: (users: RoomUser[]) => void;
+  setUsers: (users: PublicUser[]) => void;
   setRoomConfig: (roomConfig: RoomConfig) => void;
   setProblems: (problems: Problem[] | null) => void;
   setProblemCode: (problemId: number, language: string, code: string) => void;
@@ -151,7 +129,7 @@ export const useRoomData = create<{
     set((old) => ({
       chatMessages: [...old.chatMessages, message],
     })),
-  setUsers: (users: RoomUser[]) =>
+  setUsers: (users: PublicUser[]) =>
     set({
       users,
     }),
