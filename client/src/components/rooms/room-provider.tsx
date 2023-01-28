@@ -259,6 +259,14 @@ export const RoomProvider: React.FC<
     wsRef.current.addEventListener("error", onError);
     wsRef.current.addEventListener("close", onClose);
 
+    const pingInterval = setInterval(() => {
+      wsRef.current?.send(
+        JSON.stringify({
+          t: "Ping",
+        })
+      );
+    }, 1000 * 20);
+
     return () => {
       wsRef.current?.removeEventListener("open", onConnect);
       wsRef.current?.removeEventListener("message", onMessage);
@@ -267,6 +275,7 @@ export const RoomProvider: React.FC<
 
       wsRef.current?.close();
       wsRef.current = undefined;
+      clearInterval(pingInterval);
     };
   }, [
     canConnectQuery.data,
