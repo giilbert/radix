@@ -8,7 +8,15 @@ export const Navbar: React.FC<{ selectedPage?: "rooms" | "problems" }> = ({
   const { data: session, status } = useSession();
 
   return (
-    <Center position="fixed" top="0" left="0" w="100vw" h="14" bg="#232934">
+    <Center
+      position="fixed"
+      top="0"
+      left="0"
+      w="100vw"
+      h="14"
+      bg="#232934"
+      zIndex="99"
+    >
       <HStack w="6xl" mx="4" gap="1">
         <Heading fontSize="xl" mr="4">
           Radix
