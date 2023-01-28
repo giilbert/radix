@@ -162,6 +162,8 @@ export const Chat: React.FC = () => {
           h="full"
           resize="none"
           borderRadius="0"
+          borderX="none"
+          borderBottom="none"
           bg="gray.800"
           onKeyPress={(e) => {
             if (e.key === "Enter" && e.currentTarget.value === "") {
