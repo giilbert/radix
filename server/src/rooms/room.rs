@@ -443,7 +443,9 @@ impl Room {
                                     self.send_connection(
                                         &conn_id,
                                         &ServerSentCommand::SetTestResponse(
-                                            TestResponse::AllTestsPassed { runtime: 328921920 },
+                                            TestResponse::AllTestsPassed {
+                                                runtime: results.runtime,
+                                            },
                                         ),
                                     )
                                     .await?;

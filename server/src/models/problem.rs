@@ -57,7 +57,7 @@ pub struct ListingProblem {
     pub author: PublicUser,
     pub description: String,
     pub difficulty: u8,
-    pub draft: bool,
+    pub draft: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -115,7 +115,7 @@ impl ProblemRepo {
                 description: p.description.clone(),
                 author: p.author.clone(),
                 difficulty: p.difficulty,
-                draft: p.test_cases.len() < 5,
+                draft: Some(p.test_cases.len() < 5),
             })
             .collect::<Vec<_>>())
     }

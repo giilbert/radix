@@ -72,7 +72,9 @@ export const Editors: React.FC = () => {
             return (
               <TabPanel p="0" h="100%" key={user.id}>
                 {user.id !== session.user.id && (
-                  <Text key={user.id}>No peeking</Text>
+                  <Text key={user.id} p="4" fontSize="xl">
+                    TODO: see other people&apos;s editor
+                  </Text>
                 )}
 
                 {user.id === session.user.id && (
