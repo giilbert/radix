@@ -27,7 +27,7 @@ export const SidePanel: React.FC = () => {
   return (
     <Box m="4">
       <Heading fontSize="2xl">
-        <Code fontSize="2xl" ml="2">
+        <Code fontSize="2xl">
           {router.query.name}
         </Code>
       </Heading>
