@@ -112,6 +112,8 @@ export const TestResults: React.FC = () => {
       )}
 
       <ReactConfetti
+        width={window.innerWidth}
+        height={window.innerHeight}
         numberOfPieces={confetti ? 500 : 0}
         recycle={false}
         onConfettiComplete={(confetti) => confetti?.reset()}

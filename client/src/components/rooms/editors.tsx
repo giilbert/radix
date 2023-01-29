@@ -18,6 +18,7 @@ import { useSession } from "next-auth/react";
 import { throttle } from "@/lib/utils/throttle";
 import { useState } from "react";
 import { TestResults } from "./test-results";
+import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 
 export const Editors: React.FC = () => {
   const { data: session } = useSession();
@@ -35,6 +36,7 @@ export const Editors: React.FC = () => {
     "python" | "javascript"
   >("python");
   const [currentTab, setCurrentTab] = useState(0);
+  const isMobile = useIsMobile();
 
   const isResultsActive = testStatus.t !== "None";
 
@@ -65,9 +67,37 @@ export const Editors: React.FC = () => {
               {user.id === session.user.id ? "You" : user.name}
             </Tab>
           ))}
+
+          {isMobile && !problems && (
+            <Button
+              ml="auto !important"
+              m="2"
+              size="sm"
+              w="20"
+              bgColor="green.500"
+              onClick={() => {
+                room.sendCommand({
+                  t: "BeginRound",
+                  c: null,
+                });
+              }}
+            >
+              Start!
+            </Button>
+          )}
         </TabList>
 
-        <TabPanels h={`calc(100vh${isResultsActive ? " - 26rem" : " - 6rem"})`}>
+        <TabPanels
+          h={`calc(100vh${
+            isResultsActive
+              ? isMobile
+                ? " - 29rem"
+                : " - 26rem"
+              : isMobile
+              ? " - 9rem"
+              : " - 6rem"
+          })`}
+        >
           {users.map((user) => {
             return (
               <TabPanel p="0" h="100%" key={user.id}>
