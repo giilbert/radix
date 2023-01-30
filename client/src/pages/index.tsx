@@ -51,7 +51,9 @@ const Home: NextPage = () => {
             onClick={modalDisclosure.onOpen}
             ml="auto !important"
             px="8"
-            colorScheme="green"
+            bgColor="green.500"
+            _hover={{ bgColor: "green.400" }}
+            _active={{ bgColor: "green.500" }}
             leftIcon={<FiPlus size={20} />}
           >
             Create
@@ -80,6 +82,7 @@ const Home: NextPage = () => {
             ))}
         </VStack>
       )}
+
       {roomsQuery.status === "error" && (
         <Box mt="4">
           <AxiosErrorMessage error={roomsQuery.error} />

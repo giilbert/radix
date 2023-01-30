@@ -48,7 +48,13 @@ export const Navbar: React.FC<{ selectedPage?: "rooms" | "problems" }> = ({
             {status === "authenticated" ? (
               <>
                 <Text>{session.user?.name}</Text>
-                <Button colorScheme="red" size="sm" onClick={() => signOut()}>
+                <Button
+                  bgColor="red.500"
+                  _hover={{ bgColor: "red.400" }}
+                  _active={{ bgColor: "red.500" }}
+                  size="sm"
+                  onClick={() => signOut()}
+                >
                   Sign out
                 </Button>
               </>
