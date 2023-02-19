@@ -1,9 +1,10 @@
 use lazy_static::lazy_static;
-use piston_rs::{Client, Executor, File};
+use parking_lot::RwLock;
+use piston_rs::{Client, ExecResponse, Executor, File};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 
 use crate::models::problem::TestCase;
 
@@ -33,6 +34,9 @@ lazy_static! {
     static ref PISTON_SLASH_JOB: Regex = Regex::new("/piston/jobs/[a-zA-Z0-9-]+/").unwrap();
 }
 
+static JOB_QUEUE: RwLock<Option<mpsc::Sender<(Executor, oneshot::Sender<ExecResponse>)>>> =
+    RwLock::new(None);
+
 // TODO: language
 pub async fn judge(
     language: &String,
@@ -41,11 +45,6 @@ pub async fn judge(
 ) -> anyhow::Result<JudgingResults> {
     // tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
-    let client = if let Ok(url) = dotenvy::var("PISTON_URL") {
-        Client::with_url(&url)
-    } else {
-        Client::default()
-    };
     let executor = Executor::new()
         .set_language("python")
         .set_version("3.10.0")
@@ -55,10 +54,7 @@ pub async fn judge(
             "utf8",
         )]);
 
-    let result = client
-        .execute(&executor)
-        .await
-        .map_err(|err| anyhow::anyhow!("{}", err))?;
+    let result = run_job(executor).await?;
 
     if result.run.stderr != "" {
         return Err(anyhow::anyhow!(
@@ -108,6 +104,39 @@ pub async fn judge(
         okay_tests,
         runtime: output.runtime,
     })
+}
+
+async fn run_job(executor: Executor) -> anyhow::Result<ExecResponse> {
+    let (tx, rx) = oneshot::channel::<ExecResponse>();
+
+    if JOB_QUEUE.read().is_none() {
+        let (tx, mut rx) = mpsc::channel::<(Executor, oneshot::Sender<ExecResponse>)>(500);
+        tokio::spawn(async move {
+            let client = if let Ok(url) = dotenvy::var("PISTON_URL") {
+                Client::with_url(&url)
+            } else {
+                Client::default()
+            };
+
+            while let Some((executor, tx)) = rx.recv().await {
+                let result = client
+                    .execute(&executor)
+                    .await
+                    .map_err(|err| anyhow::anyhow!("{}", err))?;
+                tx.send(result).unwrap();
+
+                tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+            }
+
+            Ok::<_, anyhow::Error>(())
+        });
+        *JOB_QUEUE.write() = Some(tx);
+    }
+
+    let job_queue = JOB_QUEUE.read().as_ref().unwrap().clone();
+    job_queue.send((executor, tx)).await?;
+
+    Ok(rx.await?)
 }
 
 const PYTHON_TEMPLATE: &str = include_str!("./templates/python-runner.py");
