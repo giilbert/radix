@@ -37,6 +37,7 @@ export const Editors: React.FC = () => {
   >("python");
   const [currentTab, setCurrentTab] = useState(0);
   const isMobile = useIsMobile();
+  const roomHasStarted = problems !== null;
 
   const isResultsActive = testStatus.t !== "None";
 
@@ -139,72 +140,75 @@ export const Editors: React.FC = () => {
         </TabPanels>
       </Tabs>
 
-      <Box>
-        {isResultsActive && <TestResults />}
+      {roomHasStarted && (
+        <Box>
+          {isResultsActive && <TestResults />}
 
-        <HStack alignItems="center" h="3rem" justify="flex-end" pr="1">
-          <Select
-            mr="auto"
-            w="36"
-            onChange={(event) => {
-              setSelectedLanguage(
-                event.currentTarget.value.toLowerCase() as any
-              );
-            }}
-          >
-            <option>Python</option>
-            {/* <option>JavaScript</option> */}
-          </Select>
+          <HStack alignItems="center" h="3rem" justify="flex-end" pr="1">
+            <Select
+              mr="auto"
+              w="36"
+              onChange={(event) => {
+                setSelectedLanguage(
+                  event.currentTarget.value.toLowerCase() as any
+                );
+              }}
+            >
+              <option>Python</option>
+              {/* <option>JavaScript</option> */}
+            </Select>
 
-          <Button
-            w="28"
-            isLoading={testStatus.t === "Awaiting"}
-            onClick={throttle(() => {
-              if (!problems) return;
+            <Button
+              w="28"
+              isLoading={testStatus.t === "Awaiting"}
+              onClick={throttle(() => {
+                if (!problems) return;
 
-              room.sendCommand({
-                t: "SetEditorContent",
-                c: {
-                  content:
-                    code.get(currentProblemIndex)?.get(selectedLanguage) || "",
-                },
-              });
-              setTestStatus({
-                t: "Awaiting",
-                c: null,
-              });
-              room.sendCommand({
-                t: "TestCode",
-                c: {
-                  language: selectedLanguage,
-                  testCases: problems[currentProblemIndex].defaultTestCases,
-                },
-              });
-            })}
-          >
-            Test
-          </Button>
-          <Button
-            w="28"
-            isLoading={testStatus.t === "Awaiting"}
-            onClick={throttle(() => {
-              setTestStatus({
-                t: "Awaiting",
-                c: null,
-              });
-              room.sendCommand({
-                t: "SubmitCode",
-                c: {
-                  problemIndex: currentProblemIndex,
-                  language: selectedLanguage,
-                },
-              });
-            })}
-          >
-            Submit
-          </Button>
-        </HStack>
-      </Box>
+                room.sendCommand({
+                  t: "SetEditorContent",
+                  c: {
+                    content:
+                      code.get(currentProblemIndex)?.get(selectedLanguage) ||
+                      "",
+                  },
+                });
+                setTestStatus({
+                  t: "Awaiting",
+                  c: null,
+                });
+                room.sendCommand({
+                  t: "TestCode",
+                  c: {
+                    language: selectedLanguage,
+                    testCases: problems[currentProblemIndex].defaultTestCases,
+                  },
+                });
+              })}
+            >
+              Test
+            </Button>
+            <Button
+              w="28"
+              isLoading={testStatus.t === "Awaiting"}
+              onClick={throttle(() => {
+                setTestStatus({
+                  t: "Awaiting",
+                  c: null,
+                });
+                room.sendCommand({
+                  t: "SubmitCode",
+                  c: {
+                    problemIndex: currentProblemIndex,
+                    language: selectedLanguage,
+                  },
+                });
+              })}
+            >
+              Submit
+            </Button>
+          </HStack>
+        </Box>
+      )}
     </Box>
   );
 };
