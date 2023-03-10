@@ -109,7 +109,7 @@ export const SidePanel: React.FC = () => {
                 <FiChevronLeft />
               </Button>
 
-              <Text>
+              <Text whiteSpace="nowrap">
                 {currentProblemIndex + 1} / {problems?.length || 0}
               </Text>
 
