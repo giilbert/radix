@@ -62,7 +62,7 @@ fn create_cors_layer() -> anyhow::Result<CorsLayer> {
         ])
         .allow_credentials(true)
         .allow_origin([
-            "https://radix.gilbertz.works".parse()?,
+            "https://radix.gilbertz.tech".parse()?,
             "http://localhost:3000".parse()?,
             "http://127.0.0.1:3000".parse()?,
         ]))
