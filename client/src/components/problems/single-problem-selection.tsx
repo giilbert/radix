@@ -109,7 +109,9 @@ export const SingleProblemSelection: React.FC<{ index: number }> = ({
             ml="auto !important"
             icon={<FiTrash />}
             size="sm"
-            colorScheme="red"
+            bgColor="red.500"
+            _hover={{ bgColor: "red.400" }}
+            _active={{ bgColor: "red.500" }}
             onClick={() => problems.remove(index)}
           />
         </HStack>
@@ -131,7 +133,9 @@ export const SingleProblemSelection: React.FC<{ index: number }> = ({
             ml="auto !important"
             icon={<FiTrash />}
             size="sm"
-            colorScheme="red"
+            bgColor="red.500"
+            _hover={{ bgColor: "red.400" }}
+            _active={{ bgColor: "red.500" }}
             onClick={() => problems.remove(index)}
           />
         </HStack>

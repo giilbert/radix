@@ -1,4 +1,19 @@
-import { Box, Button, Code, Heading, HStack, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Code,
+  Heading,
+  HStack,
+  IconButton,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalHeader,
+  ModalOverlay,
+  Text,
+  useDisclosure,
+} from "@chakra-ui/react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import {
@@ -6,6 +21,7 @@ import {
   FiArrowRight,
   FiChevronLeft,
   FiChevronRight,
+  FiMaximize,
 } from "react-icons/fi";
 import { MarkdownRender } from "../ui/markdown-render";
 import { useRoom, useRoomData } from "./room-provider";
@@ -20,6 +36,7 @@ export const SidePanel: React.FC = () => {
     currentProblemIndex,
     setTestStatus,
   } = useRoomData();
+  const joinLinkModalDisclosure = useDisclosure();
   const room = useRoom();
 
   if (!session || !roomConfig) return <Text>Loading</Text>;
@@ -27,10 +44,28 @@ export const SidePanel: React.FC = () => {
   return (
     <Box m="4">
       <Heading fontSize="2xl">
-        Room
-        <Code fontSize="2xl" ml="2">
-          {router.query.name}
-        </Code>
+        <Code fontSize="2xl">{router.query.name}</Code>
+
+        <IconButton
+          aria-label="Show code full screen"
+          ml="1"
+          size="sm"
+          onClick={joinLinkModalDisclosure.onOpen}
+        >
+          <FiMaximize />
+        </IconButton>
+
+        <Modal {...joinLinkModalDisclosure} size="6xl">
+          <ModalOverlay />
+          <ModalContent>
+            <ModalCloseButton />
+            <ModalHeader>Join Link</ModalHeader>
+
+            <ModalBody textAlign="center" mb="8">
+              <Heading size="3xl">{window.location.href}</Heading>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
       </Heading>
 
       <hr />
@@ -74,7 +109,7 @@ export const SidePanel: React.FC = () => {
                 <FiChevronLeft />
               </Button>
 
-              <Text>
+              <Text whiteSpace="nowrap">
                 {currentProblemIndex + 1} / {problems?.length || 0}
               </Text>
 
