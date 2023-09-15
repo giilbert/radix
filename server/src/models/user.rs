@@ -2,6 +2,7 @@ use axum::{
     async_trait,
     extract::FromRequestParts,
     http::{request::Parts, StatusCode},
+    routing::Route,
 };
 use chrono::{DateTime, Utc};
 use mongodb::bson::{self, doc, oid::ObjectId};
@@ -159,7 +160,8 @@ impl UserRepo {
     }
 
     pub async fn create_user_session(&self, data: &Session) -> Result<Option<User>, RouteErr> {
-        self.0
+        let mut user = self
+            .0
             .collection::<User>("users")
             .find_one_and_update(
                 doc! {
@@ -173,7 +175,47 @@ impl UserRepo {
                 None,
             )
             .await
-            .convert(Some("Error creating session"))
+            .convert(Some("Error creating session"))?
+            .ok_or_else(|| RouteErr::Msg(StatusCode::NOT_FOUND, "User not found".to_string()))?;
+
+        if user.sessions.len() > 7 {
+            log::info!("Too many sessions on user id {}, deleting oldest", user.id);
+            // find the oldest session and delete it
+            let oldest_session = user
+                .sessions
+                .iter()
+                .min_by_key(|sess| sess.expires)
+                .expect("an oldest session to exist")
+                .clone();
+
+            let deleted = self
+                .0
+                .collection::<User>("users")
+                .find_one_and_update(
+                    doc! {
+                        "_id": &data.user_id.to_object_id()?,
+                    },
+                    doc! {
+                        "$pull": {
+                            "sessions": {
+                                "sessionToken": oldest_session.session_token,
+                            }
+                        }
+                    },
+                    None,
+                )
+                .await
+                .convert(Some("Error deleting old session"))?;
+
+            if deleted.is_none() {
+                return Err(RouteErr::Msg(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Error deleting old session".to_string(),
+                ));
+            }
+        }
+
+        Ok(Some(user))
     }
 
     pub async fn get_session_and_user(

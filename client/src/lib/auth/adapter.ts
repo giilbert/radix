@@ -33,7 +33,7 @@ export function CustomAdapter(): Adapter {
     },
 
     getUserByEmail: async (email) => {
-      // console.log("getUserByEmail", email);
+      console.log("getUserByEmail", email);
       const res = await axios.get("auth/user-email/" + email);
       if (res.status === 200) return res.data;
       console.error(res.data);
@@ -41,7 +41,7 @@ export function CustomAdapter(): Adapter {
     },
 
     getUserByAccount: async (account) => {
-      // console.log("getUserByAccount", account);
+      console.log("getUserByAccount", account);
       const res = await axios.get(
         "auth/user-account/" +
           account.provider +
@@ -67,18 +67,18 @@ export function CustomAdapter(): Adapter {
         idToken: acc.id_token,
       };
 
-      // console.log("linkAccount", JSON.stringify(data));
+      console.log("linkAccount", JSON.stringify(data));
       await axios.post("auth/link-account", data);
     },
 
     createSession: async (session) => {
-      // console.log("createSession", session);
+      console.log("createSession", session);
       await axios.post("auth/session", session);
       return session;
     },
 
     getSessionAndUser: async (sessionToken: string) => {
-      // console.log("getSessionAndUser", sessionToken);
+      console.log("getSessionAndUser", sessionToken);
       const res = await axios.get("auth/session/" + sessionToken);
       if (res.status === 404) return null;
       if (!res.data) throw "Error fetching session and user";
@@ -93,7 +93,7 @@ export function CustomAdapter(): Adapter {
     },
 
     deleteSession: async (sessionToken) => {
-      // console.log("deleteSession", sessionToken);
+      console.log("deleteSession", sessionToken);
       const res = await axios.delete("auth/session/" + sessionToken);
       if (res.status !== 200) throw "Error deleting session";
     },
