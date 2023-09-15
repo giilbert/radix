@@ -25,7 +25,7 @@ export default NextAuth({
         path: "/",
         secure: true,
         domain:
-          process.env.NODE_ENV === "production" ? "gilbertz.works" : undefined,
+          process.env.NODE_ENV === "production" ? "gilbertz.tech" : undefined,
       },
     },
   },
