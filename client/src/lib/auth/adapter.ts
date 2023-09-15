@@ -4,6 +4,9 @@ import { Adapter } from "next-auth/adapters";
 
 export const axios = defaultAxios.create({
   baseURL: BACKEND_URL,
+  headers: {
+    authorization: "Bearer " + process.env.SERVER_AUTH,
+  },
   validateStatus: (status) => status >= 200 && status < 500,
 });
 

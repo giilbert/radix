@@ -1,9 +1,13 @@
 use axum::{
+    body::Body,
     extract::Path,
-    http::StatusCode,
+    http::{HeaderMap, Request, StatusCode},
+    middleware::{self, Next},
+    response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
+use reqwest::header::{HeaderName, AUTHORIZATION};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -12,6 +16,32 @@ use crate::{
     utils::auth::verify_user,
     AppState,
 };
+
+async fn server_auth_fn(
+    headers: HeaderMap,
+    request: Request<Body>,
+    next: Next<Body>,
+) -> Result<Response, RouteErr> {
+    let auth = headers
+        .get(AUTHORIZATION)
+        .map(|value| {
+            value
+                .to_str()
+                .map(|v| v.to_string().replace("Bearer ", ""))
+                .ok()
+        })
+        .flatten()
+        .ok_or_else(|| RouteErr::Msg(StatusCode::BAD_REQUEST, "No authorization header.".into()))?;
+
+    if auth != dotenvy::var("SERVER_AUTH").expect("SERVER_AUTH set in .env") {
+        return Err(RouteErr::Msg(
+            StatusCode::UNAUTHORIZED,
+            "Unauthorized".into(),
+        ));
+    }
+
+    Ok(next.run(request).await)
+}
 
 pub fn auth_routes() -> Router<AppState> {
     Router::new()
@@ -30,6 +60,7 @@ pub fn auth_routes() -> Router<AppState> {
         )
         .route("/session", post(create_session))
         .route("/link-account", post(link_account))
+        .layer(middleware::from_fn(server_auth_fn))
 }
 
 // TODO: verify that access token is valid
