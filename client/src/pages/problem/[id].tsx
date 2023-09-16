@@ -1,7 +1,7 @@
 import { Layout } from "@/components/layout/layout";
 import { ProblemEditor } from "@/components/problems/problem-editor";
 import { ProblemView } from "@/components/problems/problem-view";
-import { Problem } from "@/types/problem";
+import { Problem, TestCase } from "@/types/problem";
 import { Box, Button, HStack } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
 import { NextPage } from "next";
@@ -14,12 +14,13 @@ const ProblemPage: NextPage = () => {
   const router = useRouter();
   const { data: session } = useSession();
   const [isEditing, setIsEditing] = useState(false);
-  const problemQuery = useQuery<Problem>(
-    [`problem/${router.query.id as string}`],
-    {
-      enabled: !!router.query.id,
+  const problemQuery = useQuery<
+    Problem & {
+      testCases: TestCase[];
     }
-  );
+  >([`problem/${router.query.id as string}`], {
+    enabled: !!router.query.id,
+  });
 
   return (
     <Layout title="Problem" selectedPage="problems">
