@@ -18,6 +18,7 @@ import { Controller, FormProvider } from "react-hook-form";
 import { z } from "zod";
 import { AxiosErrorMessage } from "../ui/axios-error-message";
 import { PickProblems } from "./pick-problems";
+import { useRouter } from "next/router";
 
 const SPECIAL_CHARACTERS_REGEX = /[^a-zA-Z0-9_-]/g;
 
@@ -48,6 +49,7 @@ export const createRoomFormSchema = z.object({
 export type CreateRoomFormData = z.infer<typeof createRoomFormSchema>;
 
 export const CreateRoom: React.FC = () => {
+  const router = useRouter();
   const [stage, setStage] = useState<"general" | "problems">("general");
   const form = useZodForm({
     schema: createRoomFormSchema,
@@ -68,10 +70,10 @@ export const CreateRoom: React.FC = () => {
     async (values: CreateRoomFormData) => {
       try {
         await createRoom.mutateAsync(values);
-        window.location.href = `/room/${values.name}`;
+        router.push(`/room/${values.name}`);
       } catch {}
     },
-    [createRoom]
+    [createRoom, router]
   );
 
   return (
