@@ -7,7 +7,6 @@ use axum::{
     extract::FromRequestParts,
     http::{request::Parts, StatusCode},
 };
-use regex::Regex;
 
 pub async fn verify_user(token: &String) -> Result<bool, RouteErr> {
     let res = reqwest::get(format!(
@@ -30,9 +29,31 @@ pub async fn verify_user(token: &String) -> Result<bool, RouteErr> {
     }
 }
 
-lazy_static::lazy_static! {
-    static ref SESSION_TOKEN_REGEX: Regex =
-        Regex::new("next-auth\\.session-token=([a-zA-Z0-9\\-]+);?").unwrap();
+fn get_session_token_from_authorization(parts: &mut Parts) -> Result<String, StatusCode> {
+    let session_token = parts
+        .headers
+        .get("Authorization")
+        .ok_or_else(|| StatusCode::UNAUTHORIZED)?
+        .to_str()
+        .map_err(|_| StatusCode::BAD_REQUEST)?
+        .replace("Bearer ", "")
+        .to_string();
+
+    Ok(session_token)
+}
+
+fn get_session_token_from_query(parts: &mut Parts) -> Result<String, StatusCode> {
+    let session_token = parts
+        .uri
+        .query()
+        .ok_or_else(|| StatusCode::UNAUTHORIZED)?
+        .split("&")
+        .find(|q| q.starts_with("s="))
+        .ok_or_else(|| StatusCode::UNAUTHORIZED)?
+        .replace("s=", "")
+        .to_string();
+
+    Ok(session_token)
 }
 
 #[async_trait]
@@ -42,18 +63,8 @@ where
 {
     type Rejection = StatusCode;
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let cookie = parts
-            .headers
-            .get("cookie")
-            .ok_or(StatusCode::UNAUTHORIZED)?
-            .to_str()
-            .map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)?
-            .to_string();
-
-        let captures = &SESSION_TOKEN_REGEX
-            .captures(&cookie)
-            .ok_or(StatusCode::UNAUTHORIZED)?;
-        let session_token = captures.get(1).ok_or(StatusCode::UNAUTHORIZED)?.as_str();
+        let session_token = get_session_token_from_authorization(parts)
+            .or_else(|_| get_session_token_from_query(parts))?;
 
         let user_repo = UserRepo::from_request_parts(parts, state).await?;
         let session_and_user = user_repo

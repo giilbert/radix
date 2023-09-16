@@ -21,11 +21,9 @@ export default NextAuth({
       name: "next-auth.session-token",
       options: {
         httpOnly: false,
-        sameSite: "None",
+        sameSite: "Lax",
         path: "/",
         secure: true,
-        domain:
-          process.env.NODE_ENV === "production" ? "gilbertz.tech" : undefined,
       },
     },
   },

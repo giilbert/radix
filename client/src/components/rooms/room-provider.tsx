@@ -17,6 +17,7 @@ import {
 } from "react";
 import create from "zustand";
 import { UhOh } from "../ui/uh-oh";
+import { getSessionCookie } from "@/utils/axios";
 
 type ChatMessage = Enum<{
   Connection: {
@@ -218,7 +219,8 @@ export const RoomProvider: React.FC<
       return;
 
     wsRef.current = new WebSocket(
-      BACKEND_URL.replace("http", "ws") + `/room/${router.query.name}`
+      BACKEND_URL.replace("http", "ws") +
+        `/room/${router.query.name}?s=${getSessionCookie()}`
     );
 
     const onConnect = (e: Event) => {
