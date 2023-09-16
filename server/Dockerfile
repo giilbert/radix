@@ -1,11 +1,13 @@
-FROM rust:1.66 as builder
+FROM rust:1.70-alpine3.18 as builder
 
 WORKDIR /usr/src
+RUN apk add --no-cache musl-dev libressl-dev
+
 RUN USER=root cargo new radix_server
 
 WORKDIR /usr/src/radix_server
 
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 
 RUN cargo build --release \
     && rm -rf src
@@ -18,11 +20,10 @@ RUN cargo build --release \
     && mv target/release/radix_server /bin \
     && rm -rf /usr/src/radix_server
 
-FROM debian:latest
+FROM alpine:3.18
 
-RUN apt-get update \
-    && apt-get install -y ca-certificates \
-    && rm -rf rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache libressl-dev ca-certificates-bundle bash
 COPY --from=builder /bin/radix_server /bin/radix_server
+ENV RUST_LOG=info
 
 CMD ["/bin/radix_server"]

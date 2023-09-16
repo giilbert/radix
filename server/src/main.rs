@@ -62,7 +62,7 @@ fn create_cors_layer() -> anyhow::Result<CorsLayer> {
         ])
         .allow_credentials(true)
         .allow_origin([
-            "https://radix.gilbertz.tech".parse()?,
+            dotenvy::var("CORS_ORIGIN")?.parse()?,
             "http://localhost:3000".parse()?,
             "http://127.0.0.1:3000".parse()?,
         ]))
