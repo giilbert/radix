@@ -6,12 +6,17 @@ export const getSessionCookie = () => {
     // TODO: serverside impl
     return "";
   }
-  const name = "next-auth.session-token=";
+  const names = [
+    "next-auth.session-token=",
+    "__Secure-next-auth.session-token=",
+  ];
   const decodedCookie = decodeURIComponent(document.cookie);
   const cookies = decodedCookie.split(";");
   for (const cookie of cookies) {
-    if (cookie.indexOf(name) === 0) {
-      return cookie.substring(name.length, cookie.length);
+    if (cookie.startsWith(names[0])) {
+      return cookie.substring(names[0].length, cookie.length);
+    } else if (cookie.startsWith(names[1])) {
+      return cookie.substring(names[1].length, cookie.length);
     }
   }
   return "";
