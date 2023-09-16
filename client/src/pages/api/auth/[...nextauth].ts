@@ -18,7 +18,10 @@ export default NextAuth({
   adapter: CustomAdapter(),
   cookies: {
     sessionToken: {
-      name: "next-auth.session-token",
+      name:
+        process.env.NODE_ENV === "development"
+          ? "next-auth.session-token"
+          : "__Secure-next-auth.session-token",
       options: {
         httpOnly: false,
         sameSite: "Lax",
